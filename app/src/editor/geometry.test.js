@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { drawDraftToCanvas, sourceRectForDraft } from './geometry'
+import { drawDraftToCanvas, drawPlanForDraft, sourceRectForDraft } from './geometry'
 
 const base = {
   source: { width: 1200, height: 800 },
@@ -109,5 +109,18 @@ describe('drawDraftToCanvas', () => {
     expect(ctx.drawImage).toHaveBeenCalledWith(
       expect.anything(), 200, 0, 800, 800, -36, -48, 72, 96,
     )
+  })
+
+  it.each([90, 270])('swaps reviewed destination dimensions for a %i degree preview quarter-turn', (rotation) => {
+    const plan = drawPlanForDraft({
+      ...base,
+      fitMode: 'crop',
+      grid: { columns: 36, rows: 24, gauge: 'true' },
+      transform: { ...base.transform, rotation },
+    }, { width: 396, height: 216 })
+
+    expect(plan.rotation).toBe(rotation)
+    expect(plan.destination).toEqual({ x: -108, y: -198, width: 216, height: 396 })
+    expect(plan.outputBounds).toEqual({ width: 396, height: 216 })
   })
 })

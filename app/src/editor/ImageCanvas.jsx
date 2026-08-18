@@ -1,20 +1,37 @@
-import { useRef } from 'react'
-import { sourceRectForDraft } from './geometry'
+import { useCallback, useEffect, useRef } from 'react'
+import { drawDraftToCanvas } from './geometry'
 
 const clampOffset = (value) => Math.max(-1, Math.min(1, value))
 
-const cropPositionForDraft = (draft) => {
-  if (!draft.source?.width || !draft.source?.height) return '50% 50%'
+const frameForGrid = (grid) => {
+  const cellWidth = grid.gauge === 'square' ? 1 : 11
+  const cellHeight = grid.gauge === 'square' ? 1 : 9
+  const width = grid.columns * cellWidth
+  const height = grid.rows * cellHeight
 
-  const { sx, sy, sw, sh } = sourceRectForDraft(draft)
-  return `${((sx + sw / 2) / draft.source.width) * 100}% ${((sy + sh / 2) / draft.source.height) * 100}%`
+  return { width, height, aspect: width / height }
 }
 
 export default function ImageCanvas({ image, draft, dispatch }) {
+  const canvasRef = useRef(null)
+  const sourceRef = useRef(null)
   const drag = useRef(null)
   const { transform, grid } = draft
   const cropEnabled = draft.fitMode === 'crop'
-  const imagePosition = cropPositionForDraft(draft)
+  const frame = frameForGrid(grid)
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current
+    const source = sourceRef.current
+    const context = canvas?.getContext('2d')
+    if (!context || !source) return
+
+    drawDraftToCanvas(context, source, draft)
+  }, [draft])
+
+  useEffect(() => {
+    if (sourceRef.current?.complete && sourceRef.current.naturalWidth > 0) draw()
+  }, [draw, image.src])
+
   const moveBy = (dx, dy, origin = transform) => dispatch({
     type: 'transform/patch',
     patch: {
@@ -60,19 +77,18 @@ export default function ImageCanvas({ image, draft, dispatch }) {
         drag.current = null
         event.currentTarget.releasePointerCapture?.(event.pointerId)
       }}
-      onPointerCancel={() => { drag.current = null }}
-      style={{ '--grid-x': `${100 / grid.columns}%`, '--grid-y': `${100 / grid.rows}%` }}
+      onPointerCancel={(event) => {
+        drag.current = null
+        event.currentTarget.releasePointerCapture?.(event.pointerId)
+      }}
+      style={{
+        '--frame-aspect': frame.aspect,
+        '--grid-x': `${100 / grid.columns}%`,
+        '--grid-y': `${100 / grid.rows}%`,
+      }}
     >
-      <img
-        src={image.src}
-        alt="Source preview"
-        draggable="false"
-        style={{
-          objectFit: cropEnabled ? 'cover' : 'fill',
-          objectPosition: imagePosition,
-          transform: `scale(${cropEnabled ? transform.scale : 1}) rotate(${transform.rotation}deg) scaleX(${transform.flipX ? -1 : 1}) scaleY(${transform.flipY ? -1 : 1})`,
-        }}
-      />
+      <canvas ref={canvasRef} role="img" aria-label="Source preview" width={frame.width} height={frame.height} />
+      <img ref={sourceRef} className="editor-canvas-source" data-testid="source-image" src={image.src} alt="" aria-hidden="true" onLoad={draw} />
       <span className="editor-grid-overlay" aria-hidden="true" />
     </div>
   )
