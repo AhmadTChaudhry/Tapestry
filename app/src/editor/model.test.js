@@ -25,6 +25,38 @@ describe('editor draft', () => {
     expect(draft.transform.rotation).toBe(90)
   })
 
+  it('clamps scale and snaps non-quarter rotations in transform patches', () => {
+    let draft = createDraft(asset, 'Fox')
+    draft = editorReducer(draft, { type: 'transform/patch', patch: { scale: 0.5, rotation: 47 } })
+
+    expect(draft.transform).toMatchObject({ scale: 1, rotation: 90 })
+
+    draft = editorReducer(draft, { type: 'transform/patch', patch: { scale: 9 } })
+    expect(draft.transform.scale).toBe(3)
+  })
+
+  it('clamps finite offsets and rejects persisted invalid transform values', () => {
+    const draft = createDraft(asset, 'Fox')
+    const patched = editorReducer(draft, {
+      type: 'transform/patch',
+      patch: { offsetX: 99, offsetY: -99 },
+    })
+
+    expect(patched.transform).toMatchObject({ offsetX: 1, offsetY: -1 })
+    expect(validateDraft({ ...draft, transform: { ...draft.transform, scale: 0 } })).toEqual({
+      ok: false,
+      reason: 'invalid-draft',
+    })
+    expect(validateDraft({ ...draft, transform: { ...draft.transform, offsetX: Number.POSITIVE_INFINITY } })).toEqual({
+      ok: false,
+      reason: 'invalid-draft',
+    })
+    expect(validateDraft({ ...draft, transform: { ...draft.transform, rotation: 45 } })).toEqual({
+      ok: false,
+      reason: 'invalid-draft',
+    })
+  })
+
   it('derives rows when dimensions are locked', () => {
     let draft = createDraft(asset, 'Fox')
     draft = editorReducer(draft, { type: 'grid/set-columns', value: 48 })

@@ -2,7 +2,9 @@ export const EDITOR_SCHEMA_VERSION = 1
 export const EDITOR_STAGES = ['frame', 'grid', 'image', 'yarn', 'review']
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, Number(n)))
-const normalizeRotation = (degrees) => ((Number(degrees) % 360) + 360) % 360
+const normalizeRotation = (degrees) => (
+  Math.round((((Number(degrees) % 360) + 360) % 360) / 90) * 90
+) % 360
 const hasFiniteNumber = (value) => {
   if (typeof value !== 'number' && typeof value !== 'string') return false
   if (typeof value === 'string' && value.trim() === '') return false
@@ -11,11 +13,21 @@ const hasFiniteNumber = (value) => {
 const hasInvalidNumericPatch = (patch, fields) => fields.some((field) => (
   patch[field] !== undefined && !hasFiniteNumber(patch[field])
 ))
+const hasInvalidBooleanPatch = (patch, fields) => fields.some((field) => (
+  patch[field] !== undefined && typeof patch[field] !== 'boolean'
+))
 const hasParseableTimestamp = (value) => typeof value === 'string' && Number.isFinite(Date.parse(value))
 const rowsForColumns = (draft, columns, gauge = draft.grid?.gauge || 'true') => {
   const gaugeCorrection = gauge === 'square' ? 1 : 11 / 9
   return clamp(Math.round(columns * (draft.source.height / draft.source.width) * gaugeCorrection), 8, 400)
 }
+const normalizeTransform = (transform) => ({
+  ...transform,
+  offsetX: clamp(transform.offsetX, -1, 1),
+  offsetY: clamp(transform.offsetY, -1, 1),
+  scale: clamp(transform.scale, 1, 3),
+  rotation: normalizeRotation(transform.rotation),
+})
 
 export function createDraft(asset, name = 'New chart') {
   const rows = clamp(Math.round(24 * (asset.height / asset.width) * (11 / 9)), 8, 400)
@@ -46,8 +58,11 @@ export function editorReducer(draft, action) {
         ? touch(draft, { fitMode: action.value })
         : draft
     case 'transform/patch':
-      if (hasInvalidNumericPatch(action.patch || {}, ['offsetX', 'offsetY', 'scale', 'rotation'])) return draft
-      return touch(draft, { transform: { ...draft.transform, ...action.patch } })
+      if (
+        hasInvalidNumericPatch(action.patch || {}, ['offsetX', 'offsetY', 'scale', 'rotation'])
+        || hasInvalidBooleanPatch(action.patch || {}, ['flipX', 'flipY'])
+      ) return draft
+      return touch(draft, { transform: normalizeTransform({ ...draft.transform, ...action.patch }) })
     case 'transform/rotate':
       if (!hasFiniteNumber(action.degrees)) return draft
       return touch(draft, { transform: { ...draft.transform, rotation: normalizeRotation(action.degrees) } })
@@ -105,6 +120,21 @@ export function validateDraft(value) {
     && Number.isFinite(value.grid.rows)
     && value.grid.rows >= 8
     && value.grid.rows <= 400
+  const transformValid = typeof value?.transform?.offsetX === 'number'
+    && Number.isFinite(value.transform.offsetX)
+    && value.transform.offsetX >= -1
+    && value.transform.offsetX <= 1
+    && typeof value.transform.offsetY === 'number'
+    && Number.isFinite(value.transform.offsetY)
+    && value.transform.offsetY >= -1
+    && value.transform.offsetY <= 1
+    && typeof value.transform.scale === 'number'
+    && Number.isFinite(value.transform.scale)
+    && value.transform.scale >= 1
+    && value.transform.scale <= 3
+    && [0, 90, 180, 270].includes(value.transform.rotation)
+    && typeof value.transform.flipX === 'boolean'
+    && typeof value.transform.flipY === 'boolean'
   const valid = value?.schemaVersion === EDITOR_SCHEMA_VERSION
     && typeof value.id === 'string'
     && typeof value.assetId === 'string'
@@ -113,6 +143,7 @@ export function validateDraft(value) {
     && (value.fitMode === 'crop' || value.fitMode === 'stretch')
     && columnsValid
     && rowsValid
+    && transformValid
     && hasParseableTimestamp(value.createdAt)
     && hasParseableTimestamp(value.updatedAt)
   return valid ? { ok: true, draft: value } : { ok: false, reason: 'invalid-draft' }

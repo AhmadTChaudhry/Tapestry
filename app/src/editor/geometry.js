@@ -1,34 +1,71 @@
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
+const boundedNumber = (value, min, max, fallback) => {
+  const number = Number(value)
+  return Number.isFinite(number) ? clamp(number, min, max) : fallback
+}
+const normalizedQuarterRotation = (value) => {
+  const degrees = Number(value)
+  if (!Number.isFinite(degrees)) return 0
+  return (Math.round((((degrees % 360) + 360) % 360) / 90) * 90) % 360
+}
+
 export function sourceRectForDraft(draft) {
   const { width, height } = draft.source
   if (draft.fitMode === 'stretch') return { sx: 0, sy: 0, sw: width, sh: height }
 
   const stitchAspect = draft.grid.gauge === 'square' ? 1 : 11 / 9
   const outputAspect = (draft.grid.columns / draft.grid.rows) * stitchAspect
+  const rotation = normalizedQuarterRotation(draft.transform.rotation)
+  const cropAspect = rotation % 180 === 0 ? outputAspect : 1 / outputAspect
   const sourceAspect = width / height
   let sw = width
   let sh = height
-  if (sourceAspect > outputAspect) sw = height * outputAspect
-  else sh = width / outputAspect
+  if (sourceAspect > cropAspect) sw = height * cropAspect
+  else sh = width / cropAspect
 
-  const scaledW = sw / draft.transform.scale
-  const scaledH = sh / draft.transform.scale
-  const maxX = (width - scaledW) / 2
-  const maxY = (height - scaledH) / 2
+  const scale = boundedNumber(draft.transform.scale, 1, 3, 1)
+  const offsetX = boundedNumber(draft.transform.offsetX, -1, 1, 0)
+  const offsetY = boundedNumber(draft.transform.offsetY, -1, 1, 0)
+  const scaledW = sw / scale
+  const scaledH = sh / scale
+  const rangeX = width - scaledW
+  const rangeY = height - scaledH
   return {
-    sx: Math.max(0, Math.min(width - scaledW, maxX + draft.transform.offsetX * maxX)),
-    sy: Math.max(0, Math.min(height - scaledH, maxY + draft.transform.offsetY * maxY)),
+    sx: clamp(rangeX * ((offsetX + 1) / 2), 0, rangeX),
+    sy: clamp(rangeY * ((offsetY + 1) / 2), 0, rangeY),
     sw: scaledW,
     sh: scaledH,
   }
 }
 
+export function drawPlanForDraft(draft, canvas) {
+  const rotation = normalizedQuarterRotation(draft.transform.rotation)
+  const quarterTurn = rotation % 180 !== 0
+  const width = quarterTurn ? canvas.height : canvas.width
+  const height = quarterTurn ? canvas.width : canvas.height
+  return {
+    sourceRect: sourceRectForDraft(draft),
+    rotation,
+    scale: {
+      x: draft.transform.flipX ? -1 : 1,
+      y: draft.transform.flipY ? -1 : 1,
+    },
+    destination: { x: -width / 2, y: -height / 2, width, height },
+    outputBounds: quarterTurn
+      ? { width: height, height: width }
+      : { width, height },
+  }
+}
+
 export function drawDraftToCanvas(ctx, image, draft) {
-  const { sx, sy, sw, sh } = sourceRectForDraft(draft)
-  const { width, height } = ctx.canvas
+  const plan = drawPlanForDraft(draft, ctx.canvas)
+  const { sx, sy, sw, sh } = plan.sourceRect
+  const { x, y, width: drawWidth, height: drawHeight } = plan.destination
+  const { width: canvasWidth, height: canvasHeight } = ctx.canvas
   ctx.save()
-  ctx.translate(width / 2, height / 2)
-  ctx.rotate((draft.transform.rotation * Math.PI) / 180)
-  ctx.scale(draft.transform.flipX ? -1 : 1, draft.transform.flipY ? -1 : 1)
-  ctx.drawImage(image, sx, sy, sw, sh, -width / 2, -height / 2, width, height)
+  ctx.translate(canvasWidth / 2, canvasHeight / 2)
+  ctx.rotate((plan.rotation * Math.PI) / 180)
+  ctx.scale(plan.scale.x, plan.scale.y)
+  ctx.drawImage(image, sx, sy, sw, sh, x, y, drawWidth, drawHeight)
   ctx.restore()
 }
