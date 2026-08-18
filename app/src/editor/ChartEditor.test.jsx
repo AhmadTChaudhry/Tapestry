@@ -1,11 +1,23 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import ChartEditor from './ChartEditor'
 import { createDraft } from './model'
 import { saveDraft } from './draftRepository'
 
 vi.mock('./draftRepository', () => ({ saveDraft: vi.fn(() => Promise.resolve()) }))
+
+afterEach(() => vi.clearAllMocks())
+
+const deferred = () => {
+  let resolve
+  let reject
+  const promise = new Promise((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+  return { promise, reject, resolve }
+}
 
 const createEditor = (overrides = {}) => {
   const draft = createDraft({ id: 'asset-1', width: 800, height: 600, mimeType: 'image/png' }, 'Rose')
@@ -119,5 +131,63 @@ describe('ChartEditor', () => {
     expect(alert).toBeVisible()
     expect(alert).toHaveClass('editor-action-alert')
     expect(alert.closest('main.editor-screen')).not.toBeNull()
+  })
+
+  it('accepts only one of two immediate Generate activations while the flush is pending', async () => {
+    const pendingSave = deferred()
+    const { onGenerate } = createEditor()
+    vi.mocked(saveDraft).mockReturnValueOnce(pendingSave.promise)
+
+    await userEvent.setup().click(screen.getByRole('tab', { name: 'Review' }))
+    const generate = screen.getByRole('button', { name: 'Generate chart' })
+    fireEvent.click(generate)
+    fireEvent.click(generate)
+
+    expect(generate).toBeDisabled()
+    expect(screen.getByText('Saving action…')).toBeVisible()
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true')
+    await waitFor(() => expect(saveDraft).toHaveBeenCalledOnce())
+
+    pendingSave.resolve()
+    await waitFor(() => expect(onGenerate).toHaveBeenCalledOnce())
+    expect(generate).toBeEnabled()
+    expect(screen.queryByText('Saving action…')).not.toBeInTheDocument()
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'false')
+  })
+
+  it('accepts the first overlapping Back or Generate action only', async () => {
+    const pendingSave = deferred()
+    const { onBack, onGenerate } = createEditor()
+    vi.mocked(saveDraft).mockReturnValueOnce(pendingSave.promise)
+
+    await userEvent.setup().click(screen.getByRole('tab', { name: 'Review' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate chart' }))
+
+    expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Generate chart' })).toBeDisabled()
+    pendingSave.resolve()
+
+    await waitFor(() => expect(onBack).toHaveBeenCalledOnce())
+    expect(onGenerate).not.toHaveBeenCalled()
+  })
+
+  it('reenables actions after a failed flush so it can be retried', async () => {
+    const pendingSave = deferred()
+    const onPersistError = vi.fn()
+    const { onBack } = createEditor({ onPersistError })
+    vi.mocked(saveDraft)
+      .mockReturnValueOnce(pendingSave.promise)
+      .mockResolvedValueOnce(undefined)
+    const back = screen.getByRole('button', { name: 'Back' })
+
+    fireEvent.click(back)
+    expect(back).toBeDisabled()
+    pendingSave.reject(new Error('disk full'))
+
+    await waitFor(() => expect(onPersistError).toHaveBeenCalledOnce())
+    expect(back).toBeEnabled()
+    fireEvent.click(back)
+    await waitFor(() => expect(onBack).toHaveBeenCalledOnce())
   })
 })

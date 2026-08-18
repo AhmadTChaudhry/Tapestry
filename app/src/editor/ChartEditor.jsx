@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { EditorProvider, useEditor } from './EditorContext'
 import ImageCanvas from './ImageCanvas'
 import { EDITOR_STAGES } from './model'
@@ -15,24 +16,32 @@ const saveStateLabel = (saveState) => {
 
 function EditorShell({ error, image, onBack, onGenerate, onPersistError }) {
   const { draft, dispatch, flushDraft, saveState } = useEditor()
+  const [actionPending, setActionPending] = useState(false)
+  const actionPendingRef = useRef(false)
 
   const completeAction = async (action) => {
+    if (actionPendingRef.current) return
+    actionPendingRef.current = true
+    setActionPending(true)
     try {
       await flushDraft()
       await action(draft)
     } catch (reason) {
       onPersistError?.(reason)
+    } finally {
+      actionPendingRef.current = false
+      setActionPending(false)
     }
   }
 
   return (
-    <main className="editor-screen">
+    <main className="editor-screen" aria-busy={actionPending}>
       <header className="editor-header">
-        <button className="press" type="button" onClick={() => void completeAction(onBack)} aria-label="Back">‹</button>
+        <button className="press" type="button" disabled={actionPending} onClick={() => void completeAction(onBack)} aria-label="Back">‹</button>
         <div className="editor-title">
           <strong>{draft.name}</strong>
           <span className={`editor-save-state editor-save-state--${saveState}`} role="status" aria-live="polite">
-            {saveStateLabel(saveState)}
+            {actionPending ? 'Saving action…' : saveStateLabel(saveState)}
           </span>
         </div>
         <button type="button" disabled aria-label="Redo">Redo</button>
@@ -52,6 +61,7 @@ function EditorShell({ error, image, onBack, onGenerate, onPersistError }) {
             activeStage={draft.activeStage}
             draft={draft}
             dispatch={dispatch}
+            actionPending={actionPending}
             onGenerate={() => void completeAction(onGenerate)}
           />
         ))}
@@ -61,7 +71,7 @@ function EditorShell({ error, image, onBack, onGenerate, onPersistError }) {
   )
 }
 
-function EditorPanel({ stage, activeStage, draft, dispatch, onGenerate }) {
+function EditorPanel({ stage, activeStage, draft, dispatch, actionPending, onGenerate }) {
   const label = STAGE_LABELS[stage]
 
   return (
@@ -79,7 +89,7 @@ function EditorPanel({ stage, activeStage, draft, dispatch, onGenerate }) {
       {stage === 'image' && <p>Image controls arrive in phase 2.</p>}
       {stage === 'yarn' && <p>Yarn mapping arrives in phase 3.</p>}
       {stage === 'review' && (
-        <button className="pill-primary" type="button" onClick={onGenerate}>
+        <button className="pill-primary" type="button" disabled={actionPending} onClick={onGenerate}>
           Generate chart
         </button>
       )}
