@@ -1,6 +1,9 @@
 import { EditorProvider, useEditor } from './EditorContext'
+import ImageCanvas from './ImageCanvas'
 import { EDITOR_STAGES } from './model'
 import StageRail, { panelIdFor, STAGE_LABELS, tabIdFor } from './StageRail'
+import FrameStage from './stages/FrameStage'
+import GridStage from './stages/GridStage'
 import './editor.css'
 
 const saveStateLabel = (saveState) => {
@@ -27,7 +30,7 @@ function EditorShell({ image, onBack, onGenerate }) {
       </header>
 
       <section className="editor-preview" aria-label="Chart preview">
-        {image?.src ? <img src={image.src} alt="Source preview" /> : null}
+        {image?.src ? <ImageCanvas image={image} draft={draft} dispatch={dispatch} /> : null}
       </section>
 
       <StageRail activeStage={draft.activeStage} dispatch={dispatch} />
@@ -39,6 +42,7 @@ function EditorShell({ image, onBack, onGenerate }) {
             stage={stage}
             activeStage={draft.activeStage}
             draft={draft}
+            dispatch={dispatch}
             onGenerate={onGenerate}
           />
         ))}
@@ -47,7 +51,7 @@ function EditorShell({ image, onBack, onGenerate }) {
   )
 }
 
-function EditorPanel({ stage, activeStage, draft, onGenerate }) {
+function EditorPanel({ stage, activeStage, draft, dispatch, onGenerate }) {
   const label = STAGE_LABELS[stage]
 
   return (
@@ -60,8 +64,8 @@ function EditorPanel({ stage, activeStage, draft, onGenerate }) {
       hidden={stage !== activeStage}
     >
       <h2>{label}</h2>
-      {stage === 'frame' && <p>Frame controls</p>}
-      {stage === 'grid' && <p>Grid controls</p>}
+      {stage === 'frame' && <FrameStage draft={draft} dispatch={dispatch} />}
+      {stage === 'grid' && <GridStage draft={draft} dispatch={dispatch} />}
       {stage === 'image' && <p>Image controls arrive in phase 2.</p>}
       {stage === 'yarn' && <p>Yarn mapping arrives in phase 3.</p>}
       {stage === 'review' && (
