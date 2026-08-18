@@ -10,6 +10,8 @@
  *    over each cluster.
  */
 
+import { drawDraftToCanvas } from '../editor/geometry'
+
 // A tapestry stitch is ~11 wide : 9 tall. STITCH_ASPECT is height/width; every
 // other ratio in the app derives from it, so gauge stays consistent between the
 // row count computed here and the cells drawn on screen.
@@ -21,19 +23,15 @@ export function rowsForImage(imgW, imgH, stitchesWide) {
   return Math.max(8, Math.min(400, rows))
 }
 
-function samplePixels(img, w, h) {
+function samplePixels(img, w, h, options = {}) {
   const c = document.createElement('canvas')
   c.width = w
   c.height = h
   const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
-  // Stretch the whole photo onto the grid rather than cropping to it. The grid
-  // is deliberately taller in cells than the photo is in pixels (rows were
-  // scaled by GAUGE_RATIO), and drawing each cell as a wide-and-short stitch
-  // undoes that exactly — so the finished fabric carries the photo's true
-  // proportions and nothing is cut off the sides.
-  ctx.drawImage(img, 0, 0, w, h)
+  if (options.draft) drawDraftToCanvas(ctx, img, options.draft)
+  else ctx.drawImage(img, 0, 0, w, h)
   const { data } = ctx.getImageData(0, 0, w, h)
   const px = new Array(w * h)
   for (let i = 0; i < w * h; i++) {
@@ -99,9 +97,9 @@ const toHex = ([r, g, b]) =>
  * are colour ranks, 0 = darkest. `colors` are those ranks' actual colours,
  * taken straight from the photo.
  */
-export function quantizeToGrid(img, stitchesWide, colorCount) {
-  const rows = rowsForImage(img.width, img.height, stitchesWide)
-  const px = samplePixels(img, stitchesWide, rows)
+export function quantizeToGrid(img, stitchesWide, colorCount, options = {}) {
+  const rows = options.rows ?? rowsForImage(img.width, img.height, stitchesWide)
+  const px = samplePixels(img, stitchesWide, rows, options)
 
   const centroids = medianCut(px, colorCount).sort((a, b) => lum(a) - lum(b))
 
