@@ -68,12 +68,12 @@ export default function MyCharts({ onOpen, onNew, onImportFile }) {
               letterSpacing: '0.04em',
             }}
           >
-            OR IMPORT A .PAT / .PNG CHART
+            OR CHOOSE AN EXISTING PHOTO
           </button>
           <input
             ref={fileRef}
             type="file"
-            accept="image/*,.pat"
+            accept="image/*"
             hidden
             onChange={(e) => {
               const f = e.target.files?.[0]

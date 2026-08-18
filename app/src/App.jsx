@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { StoreProvider } from './store'
 import MyCharts from './screens/MyCharts'
-import ImportGrid from './screens/ImportGrid'
 import ChartScreen from './screens/ChartScreen'
+import EditorRoute from './editor/EditorRoute'
 
 export default function App() {
   // Small hand-rolled router: three routes, no library needed.
@@ -18,7 +18,7 @@ export default function App() {
         />
       )}
       {route.name === 'import' && (
-        <ImportGrid
+        <EditorRoute
           initialFile={route.file}
           onBack={() => setRoute({ name: 'list' })}
           onGenerated={(id) => setRoute({ name: 'chart', id })}

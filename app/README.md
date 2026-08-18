@@ -103,3 +103,15 @@ picture ~22% taller than the finished fabric. Aran gauge is the true view.
   store has no UI attached. The empty state it leads to is implemented.
 - The sample motifs in `seed.js` are original stand-ins, not ports of the
   prototype's generator.
+
+## Photo editor foundation
+
+The import flow now opens a recoverable hybrid editor. Source images and editor
+drafts are stored locally in IndexedDB. Frame supports crop-to-fit and
+stretch-to-fit, rotation, flipping, scale, and position. Grid dimensions support
+8–120 columns and 8–400 rows, with optional aspect locking, Aran/square preview,
+and round/turned working methods.
+
+Image adjustments, owned-yarn mapping, crochet-simplicity cleanup, and review
+diagnostics are intentionally reserved for the next delivery phases described in
+`../docs/superpowers/specs/2026-08-18-photo-to-chart-editor-design.md`.
