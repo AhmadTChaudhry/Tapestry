@@ -25,15 +25,27 @@ function openDatabase() {
   return dbPromise
 }
 
-async function transact(storeName, mode, operation) {
+export async function __transact(storeName, mode, operation) {
   const db = await openDatabase()
 
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(storeName, mode)
-    const request = operation(transaction.objectStore(storeName))
+    let result
 
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
+    transaction.oncomplete = () => resolve(result)
+    transaction.onerror = () => reject(transaction.error || new Error('IndexedDB transaction failed'))
+    transaction.onabort = () => reject(transaction.error || new Error('IndexedDB transaction aborted'))
+
+    try {
+      const request = operation(transaction.objectStore(storeName), transaction)
+      request.onsuccess = () => {
+        result = request.result
+      }
+      request.onerror = () => reject(request.error || new Error('IndexedDB request failed'))
+    } catch (error) {
+      transaction.abort()
+      reject(error)
+    }
   })
 }
 
@@ -46,26 +58,30 @@ export async function saveAsset(blob, dimensions) {
     mimeType: blob.type || 'application/octet-stream',
   }
 
-  await transact('assets', 'readwrite', (store) => store.put(asset))
+  await __transact('assets', 'readwrite', (store) => store.put(asset))
   return asset
 }
 
-export const getAsset = (id) => transact('assets', 'readonly', (store) => store.get(id))
+export const getAsset = (id) => __transact('assets', 'readonly', (store) => store.get(id))
 
 export async function saveDraft(draft) {
   const checked = validateDraft(draft)
   if (!checked.ok) throw new Error(checked.reason)
 
-  await transact('drafts', 'readwrite', (store) => store.put(draft))
+  await __transact('drafts', 'readwrite', (store) => store.put(draft))
   return draft
 }
 
-export const getDraft = (id) => transact('drafts', 'readonly', (store) => store.get(id))
-export const deleteDraft = (id) => transact('drafts', 'readwrite', (store) => store.delete(id))
+export const getDraft = (id) => __transact('drafts', 'readonly', (store) => store.get(id))
+export const deleteDraft = (id) => __transact('drafts', 'readwrite', (store) => store.delete(id))
 
 export async function getLatestDraft() {
-  const drafts = await transact('drafts', 'readonly', (store) => store.getAll())
-  return drafts.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] || null
+  const drafts = await __transact('drafts', 'readonly', (store) => store.getAll())
+  const updatedAt = (draft) => {
+    const timestamp = Date.parse(draft?.updatedAt)
+    return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY
+  }
+  return drafts.sort((a, b) => updatedAt(b) - updatedAt(a))[0] || null
 }
 
 export async function __resetDatabase() {
@@ -79,6 +95,6 @@ export async function __resetDatabase() {
     const request = indexedDB.deleteDatabase(DB_NAME)
     request.onsuccess = resolve
     request.onerror = () => reject(request.error)
-    request.onblocked = resolve
+    request.onblocked = () => reject(new Error('database deletion blocked'))
   })
 }

@@ -72,6 +72,20 @@ describe('editor draft', () => {
     })
   })
 
+  it('rejects persisted drafts with missing timestamps', () => {
+    const draft = createDraft(asset, 'Fox')
+
+    expect(validateDraft({ ...draft, createdAt: undefined })).toEqual({ ok: false, reason: 'invalid-draft' })
+    expect(validateDraft({ ...draft, updatedAt: undefined })).toEqual({ ok: false, reason: 'invalid-draft' })
+  })
+
+  it('rejects persisted drafts with unparseable timestamps', () => {
+    const draft = createDraft(asset, 'Fox')
+
+    expect(validateDraft({ ...draft, createdAt: 'not-a-timestamp' })).toEqual({ ok: false, reason: 'invalid-draft' })
+    expect(validateDraft({ ...draft, updatedAt: 'not-a-timestamp' })).toEqual({ ok: false, reason: 'invalid-draft' })
+  })
+
   it('rejects persisted drafts with non-positive source dimensions or out-of-bounds grid dimensions', () => {
     const draft = createDraft(asset, 'Fox')
     const malformedDrafts = [

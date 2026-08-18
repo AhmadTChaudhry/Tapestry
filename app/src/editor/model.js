@@ -11,6 +11,7 @@ const hasFiniteNumber = (value) => {
 const hasInvalidNumericPatch = (patch, fields) => fields.some((field) => (
   patch[field] !== undefined && !hasFiniteNumber(patch[field])
 ))
+const hasParseableTimestamp = (value) => typeof value === 'string' && Number.isFinite(Date.parse(value))
 const rowsForColumns = (draft, columns, gauge = draft.grid?.gauge || 'true') => {
   const gaugeCorrection = gauge === 'square' ? 1 : 11 / 9
   return clamp(Math.round(columns * (draft.source.height / draft.source.width) * gaugeCorrection), 8, 400)
@@ -112,5 +113,7 @@ export function validateDraft(value) {
     && (value.fitMode === 'crop' || value.fitMode === 'stretch')
     && columnsValid
     && rowsValid
+    && hasParseableTimestamp(value.createdAt)
+    && hasParseableTimestamp(value.updatedAt)
   return valid ? { ok: true, draft: value } : { ok: false, reason: 'invalid-draft' }
 }
