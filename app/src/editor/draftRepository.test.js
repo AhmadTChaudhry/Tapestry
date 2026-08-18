@@ -37,6 +37,15 @@ async function putDraftDirectly(draft) {
   }
 }
 
+function replaceMethod(target, key, replacement, restores) {
+  const descriptor = Object.getOwnPropertyDescriptor(target, key)
+  Object.defineProperty(target, key, { configurable: true, writable: true, value: replacement })
+  restores.push(() => {
+    if (descriptor) Object.defineProperty(target, key, descriptor)
+    else delete target[key]
+  })
+}
+
 beforeEach(async () => {
   await __resetDatabase()
 })
@@ -109,6 +118,114 @@ describe('draft repository', () => {
     await saveDraft(latest)
 
     await expect(getLatestDraft()).resolves.toEqual(latest)
+  })
+
+  it('fulfills saveAsset only after its transaction completes', async () => {
+    const originalOpen = indexedDB.open
+    const restores = []
+    let resolveAfterRequest
+    let assetStoreInstrumented = false
+    const afterRequest = new Promise((resolve) => {
+      resolveAfterRequest = resolve
+    })
+
+    replaceMethod(indexedDB, 'open', function (...args) {
+      const openRequest = originalOpen.apply(this, args)
+      openRequest.addEventListener('success', () => {
+        const database = openRequest.result
+        const originalTransaction = database.transaction
+        replaceMethod(database, 'transaction', function (...transactionArgs) {
+          const transaction = originalTransaction.apply(this, transactionArgs)
+          const originalObjectStore = transaction.objectStore
+          replaceMethod(transaction, 'objectStore', function (...storeArgs) {
+            const store = originalObjectStore.apply(this, storeArgs)
+            if (assetStoreInstrumented || storeArgs[0] !== 'assets') return store
+
+            assetStoreInstrumented = true
+            const originalPut = store.put
+            replaceMethod(store, 'put', function (...putArgs) {
+              const request = originalPut.apply(this, putArgs)
+              let onSuccess
+              const descriptor = Object.getOwnPropertyDescriptor(request, 'onsuccess')
+              Object.defineProperty(request, 'onsuccess', {
+                configurable: true,
+                get: () => onSuccess,
+                set: (handler) => {
+                  onSuccess = (event) => {
+                    handler.call(request, event)
+                    store.get(putArgs[0].id)
+                    queueMicrotask(() => queueMicrotask(resolveAfterRequest))
+                  }
+                },
+              })
+              restores.push(() => {
+                if (descriptor) Object.defineProperty(request, 'onsuccess', descriptor)
+                else delete request.onsuccess
+              })
+              return request
+            }, restores)
+            return store
+          }, restores)
+          return transaction
+        }, restores)
+      })
+      return openRequest
+    }, restores)
+
+    try {
+      let fulfilled = false
+      const saved = saveAsset(new Blob(['pixels'], { type: 'image/png' }), { width: 640, height: 480 })
+        .then((asset) => {
+          fulfilled = true
+          return asset
+        })
+
+      await afterRequest
+      expect(fulfilled).toBe(false)
+      await expect(saved).resolves.toMatchObject({ width: 640, height: 480 })
+    } finally {
+      restores.reverse().forEach((restore) => restore())
+    }
+  })
+
+  it('rejects saveAsset when a later request aborts its transaction', async () => {
+    const originalOpen = indexedDB.open
+    const restores = []
+    let assetStoreInstrumented = false
+
+    replaceMethod(indexedDB, 'open', function (...args) {
+      const openRequest = originalOpen.apply(this, args)
+      openRequest.addEventListener('success', () => {
+        const database = openRequest.result
+        const originalTransaction = database.transaction
+        replaceMethod(database, 'transaction', function (...transactionArgs) {
+          const transaction = originalTransaction.apply(this, transactionArgs)
+          const originalObjectStore = transaction.objectStore
+          replaceMethod(transaction, 'objectStore', function (...storeArgs) {
+            const store = originalObjectStore.apply(this, storeArgs)
+            if (assetStoreInstrumented || storeArgs[0] !== 'assets') return store
+
+            assetStoreInstrumented = true
+            const originalPut = store.put
+            replaceMethod(store, 'put', function (...putArgs) {
+              const request = originalPut.apply(this, putArgs)
+              store.add({ ...putArgs[0] })
+              return request
+            }, restores)
+            return store
+          }, restores)
+          return transaction
+        }, restores)
+      })
+      return openRequest
+    }, restores)
+
+    try {
+      await expect(saveAsset(new Blob(['pixels'], { type: 'image/png' }), { width: 640, height: 480 }))
+        .rejects.toThrow()
+    } finally {
+      restores.reverse().forEach((restore) => restore())
+    }
   })
 
   it('rejects reset when an external IndexedDB connection blocks deletion', async () => {
