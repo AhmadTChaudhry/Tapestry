@@ -38,6 +38,30 @@ describe('ChartEditor', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/saved|saving/i)
   })
 
+  it('keeps a stable, labelled panel for every tab and hides inactive panels', async () => {
+    const user = userEvent.setup()
+    createEditor()
+
+    const assertPanelState = (activeStage) => {
+      expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
+      expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-label', activeStage)
+
+      for (const tab of screen.getAllByRole('tab')) {
+        const panel = document.getElementById(tab.getAttribute('aria-controls'))
+        const isActive = tab.getAttribute('aria-selected') === 'true'
+
+        expect(panel).toBeInTheDocument()
+        expect(panel).toHaveAttribute('aria-labelledby', tab.id)
+        expect(panel.hidden).toBe(!isActive)
+        if (isActive) expect(panel).toHaveAttribute('aria-label', activeStage)
+      }
+    }
+
+    assertPanelState('Frame')
+    await user.click(screen.getByRole('tab', { name: 'Grid' }))
+    assertPanelState('Grid')
+  })
+
   it('keeps the source preview visible while the active stage changes', async () => {
     const user = userEvent.setup()
     createEditor()

@@ -1,4 +1,5 @@
 import { EditorProvider, useEditor } from './EditorContext'
+import { EDITOR_STAGES } from './model'
 import StageRail, { panelIdFor, STAGE_LABELS, tabIdFor } from './StageRail'
 import './editor.css'
 
@@ -11,7 +12,6 @@ const saveStateLabel = (saveState) => {
 
 function EditorShell({ image, onBack, onGenerate }) {
   const { draft, dispatch, saveState } = useEditor()
-  const label = STAGE_LABELS[draft.activeStage]
 
   return (
     <main className="editor-screen">
@@ -32,25 +32,44 @@ function EditorShell({ image, onBack, onGenerate }) {
 
       <StageRail activeStage={draft.activeStage} dispatch={dispatch} />
 
-      <section
-        id={panelIdFor(draft.activeStage)}
-        className="editor-sheet"
-        role="tabpanel"
-        aria-label={label}
-        aria-labelledby={tabIdFor(draft.activeStage)}
-      >
-        <h2>{label}</h2>
-        {draft.activeStage === 'frame' && <p>Frame controls</p>}
-        {draft.activeStage === 'grid' && <p>Grid controls</p>}
-        {draft.activeStage === 'image' && <p>Image controls arrive in phase 2.</p>}
-        {draft.activeStage === 'yarn' && <p>Yarn mapping arrives in phase 3.</p>}
-        {draft.activeStage === 'review' && (
-          <button className="pill-primary" type="button" onClick={() => onGenerate(draft)}>
-            Generate chart
-          </button>
-        )}
-      </section>
+      <div className="editor-sheet-stack">
+        {EDITOR_STAGES.map((stage) => (
+          <EditorPanel
+            key={stage}
+            stage={stage}
+            activeStage={draft.activeStage}
+            draft={draft}
+            onGenerate={onGenerate}
+          />
+        ))}
+      </div>
     </main>
+  )
+}
+
+function EditorPanel({ stage, activeStage, draft, onGenerate }) {
+  const label = STAGE_LABELS[stage]
+
+  return (
+    <section
+      id={panelIdFor(stage)}
+      className="editor-sheet"
+      role="tabpanel"
+      aria-label={label}
+      aria-labelledby={tabIdFor(stage)}
+      hidden={stage !== activeStage}
+    >
+      <h2>{label}</h2>
+      {stage === 'frame' && <p>Frame controls</p>}
+      {stage === 'grid' && <p>Grid controls</p>}
+      {stage === 'image' && <p>Image controls arrive in phase 2.</p>}
+      {stage === 'yarn' && <p>Yarn mapping arrives in phase 3.</p>}
+      {stage === 'review' && (
+        <button className="pill-primary" type="button" onClick={() => onGenerate(draft)}>
+          Generate chart
+        </button>
+      )}
+    </section>
   )
 }
 
