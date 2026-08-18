@@ -1,0 +1,224 @@
+/* Design tokens — see README "Design Tokens".
+   Light values live on :root; night mode swaps them via [data-theme="dark"]. */
+:root {
+  --paper: #f7f3ec;
+  --canvas: #e7e1d7;
+  --surface: #ffffff;
+  --sunken: #ede6db;
+  --hairline: #eae3d8;
+  --border: #e6dfd4;
+  --border-strong: #e0d8cb;
+  --ink: #1e1b18;
+  --body: #6e655c;
+  --muted: #8a8177;
+  --faint: #a2988c;
+  --faint-2: #b2a899;
+  --accent: #b4553c;
+  --accent-readout: #b4553c;
+  /* fill behind small chips sitting on a surface */
+  --chip: #f7f3ec;
+  /* sheets and other surfaces that lift off the page */
+  --raised: #ffffff;
+
+  --shadow-card: 0 1px 3px rgba(30, 27, 24, 0.1);
+  --shadow-knob: 0 2px 6px rgba(30, 27, 24, 0.14);
+  --shadow-sheet: 0 -12px 40px rgba(30, 27, 24, 0.18);
+
+  /* System stacks — the sans/mono split is load-bearing: every count,
+     row number and gauge label is mono on purpose. */
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  --worked-opacity: 0.34;
+}
+
+[data-theme='dark'] {
+  --paper: #14120f;
+  --canvas: #14120f;
+  --surface: #14120f;
+  --sunken: #241f1a;
+  --hairline: #2a2620;
+  --border: #2a2620;
+  --border-strong: #2a2620;
+  --ink: #f0eae0;
+  --body: #7e7568;
+  --muted: #7e7568;
+  --faint: #7e7568;
+  --faint-2: #6e6559;
+  /* accent for fills stays #B4553C; the readout lightens for the dark ground */
+  --accent-readout: #d9764f;
+  --chip: #241f1a;
+  --raised: #241f1a;
+
+  --shadow-card: none;
+  --shadow-sheet: 0 -12px 40px rgba(0, 0, 0, 0.5);
+
+  --worked-opacity: 0.3;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  color: var(--ink);
+  background: var(--paper);
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* App shell: real full-viewport screens, not a framed card. */
+.screen {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  overflow: hidden;
+  position: relative;
+}
+
+.pad {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+/* Primary pill button */
+.pill-primary {
+  height: 54px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.pill-primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pill-outline {
+  height: 52px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.press:active {
+  transform: scale(0.985);
+}
+.press {
+  transition: transform 120ms ease-out, background-color 200ms ease-out,
+    border-color 200ms ease-out, opacity 200ms ease-out;
+}
+
+/* Hide scrollbars on the chart + legend scrollers (touch surfaces) */
+.no-bar {
+  scrollbar-width: none;
+}
+.no-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Stitches-wide slider: 4px sunken track, accent fill, 26px white knob */
+.stitch-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 26px;
+  background: transparent;
+  display: block;
+}
+.stitch-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--fill),
+    var(--sunken) var(--fill) 100%
+  );
+}
+.stitch-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--fill),
+    var(--sunken) var(--fill) 100%
+  );
+}
+.stitch-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -11px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-knob);
+}
+.stitch-slider::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-knob);
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
