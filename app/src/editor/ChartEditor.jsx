@@ -13,13 +13,22 @@ const saveStateLabel = (saveState) => {
   return 'Preparing save…'
 }
 
-function EditorShell({ image, onBack, onGenerate }) {
-  const { draft, dispatch, saveState } = useEditor()
+function EditorShell({ error, image, onBack, onGenerate, onPersistError }) {
+  const { draft, dispatch, flushDraft, saveState } = useEditor()
+
+  const completeAction = async (action) => {
+    try {
+      await flushDraft()
+      await action(draft)
+    } catch (reason) {
+      onPersistError?.(reason)
+    }
+  }
 
   return (
     <main className="editor-screen">
       <header className="editor-header">
-        <button className="press" type="button" onClick={onBack} aria-label="Back">‹</button>
+        <button className="press" type="button" onClick={() => void completeAction(onBack)} aria-label="Back">‹</button>
         <div className="editor-title">
           <strong>{draft.name}</strong>
           <span className={`editor-save-state editor-save-state--${saveState}`} role="status" aria-live="polite">
@@ -43,10 +52,11 @@ function EditorShell({ image, onBack, onGenerate }) {
             activeStage={draft.activeStage}
             draft={draft}
             dispatch={dispatch}
-            onGenerate={onGenerate}
+            onGenerate={() => void completeAction(onGenerate)}
           />
         ))}
       </div>
+      {error && <div className="editor-action-alert" role="alert">{error}</div>}
     </main>
   )
 }
@@ -69,7 +79,7 @@ function EditorPanel({ stage, activeStage, draft, dispatch, onGenerate }) {
       {stage === 'image' && <p>Image controls arrive in phase 2.</p>}
       {stage === 'yarn' && <p>Yarn mapping arrives in phase 3.</p>}
       {stage === 'review' && (
-        <button className="pill-primary" type="button" onClick={() => onGenerate(draft)}>
+        <button className="pill-primary" type="button" onClick={onGenerate}>
           Generate chart
         </button>
       )}
@@ -77,10 +87,16 @@ function EditorPanel({ stage, activeStage, draft, dispatch, onGenerate }) {
   )
 }
 
-export default function ChartEditor({ draft, image, onBack, onGenerate }) {
+export default function ChartEditor({ draft, error, image, onBack, onGenerate, onPersistError }) {
   return (
     <EditorProvider initialDraft={draft}>
-      <EditorShell image={image} onBack={onBack} onGenerate={onGenerate} />
+      <EditorShell
+        error={error}
+        image={image}
+        onBack={onBack}
+        onGenerate={onGenerate}
+        onPersistError={onPersistError}
+      />
     </EditorProvider>
   )
 }

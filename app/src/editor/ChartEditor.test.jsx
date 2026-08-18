@@ -1,8 +1,11 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import ChartEditor from './ChartEditor'
 import { createDraft } from './model'
+import { saveDraft } from './draftRepository'
+
+vi.mock('./draftRepository', () => ({ saveDraft: vi.fn(() => Promise.resolve()) }))
 
 const createEditor = (overrides = {}) => {
   const draft = createDraft({ id: 'asset-1', width: 800, height: 600, mimeType: 'image/png' }, 'Rose')
@@ -92,7 +95,29 @@ describe('ChartEditor', () => {
     await user.click(screen.getByRole('tab', { name: 'Review' }))
     await user.click(screen.getByRole('button', { name: 'Generate chart' }))
 
-    expect(onBack).toHaveBeenCalledOnce()
-    expect(onGenerate).toHaveBeenCalledWith(expect.objectContaining({ id: draft.id, activeStage: 'review' }))
+    await waitFor(() => expect(onBack).toHaveBeenCalledWith(expect.objectContaining({ id: draft.id, activeStage: 'frame' })))
+    await waitFor(() => expect(onGenerate).toHaveBeenCalledWith(expect.objectContaining({ id: draft.id, activeStage: 'review' })))
+    expect(saveDraft).toHaveBeenCalledWith(expect.objectContaining({ id: draft.id, activeStage: 'review' }))
+  })
+
+  it('does not leave the editor when flushing the current draft fails', async () => {
+    const user = userEvent.setup()
+    const onPersistError = vi.fn()
+    const { onBack } = createEditor({ onPersistError })
+    vi.mocked(saveDraft).mockRejectedValueOnce(new Error('disk full'))
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+
+    await waitFor(() => expect(onPersistError).toHaveBeenCalledWith(expect.any(Error)))
+    expect(onBack).not.toHaveBeenCalled()
+  })
+
+  it('renders action errors inside the editor viewport', () => {
+    createEditor({ error: 'Changes could not be saved. Please try again.' })
+
+    const alert = screen.getByRole('alert')
+    expect(alert).toBeVisible()
+    expect(alert).toHaveClass('editor-action-alert')
+    expect(alert.closest('main.editor-screen')).not.toBeNull()
   })
 })

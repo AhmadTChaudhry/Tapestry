@@ -59,7 +59,7 @@ export default function MyCharts({ onOpen, onNew, onImportFile }) {
             + New chart from a photo
           </button>
           <button
-            className="mono press"
+            className="chart-photo-chooser mono press"
             onClick={() => fileRef.current?.click()}
             style={{
               fontSize: 11,

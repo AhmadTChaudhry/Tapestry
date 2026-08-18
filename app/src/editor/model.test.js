@@ -131,4 +131,19 @@ describe('editor draft', () => {
       expect(validateDraft(malformedDraft)).toEqual({ ok: false, reason: 'invalid-draft' })
     }
   })
+
+  it('rejects persisted drafts missing required recovery fields', () => {
+    const draft = createDraft(asset, 'Fox')
+    const malformedDrafts = [
+      { ...draft, name: '' },
+      { ...draft, activeStage: 'unknown' },
+      { ...draft, grid: { ...draft.grid, workingMethod: 'flat' } },
+      { ...draft, grid: { ...draft.grid, gauge: 'round' } },
+      { ...draft, grid: { ...draft.grid, dimensionsLocked: 'true' } },
+    ]
+
+    for (const malformedDraft of malformedDrafts) {
+      expect(validateDraft(malformedDraft)).toEqual({ ok: false, reason: 'invalid-draft' })
+    }
+  })
 })

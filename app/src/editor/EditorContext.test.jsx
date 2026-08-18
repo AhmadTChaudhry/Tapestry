@@ -108,4 +108,17 @@ describe('EditorProvider', () => {
 
     expect(saveDraft).not.toHaveBeenCalled()
   })
+
+  it('flushes the exact latest draft without waiting for the autosave debounce', async () => {
+    vi.useFakeTimers()
+    const { result } = renderHook(() => useEditor(), { wrapper: createWrapper() })
+
+    act(() => result.current.dispatch({ type: 'fit/set', value: 'stretch' }))
+    await act(async () => result.current.flushDraft())
+
+    expect(saveDraft).toHaveBeenCalledOnce()
+    expect(saveDraft).toHaveBeenCalledWith(expect.objectContaining({ fitMode: 'stretch' }))
+    await act(() => vi.advanceTimersByTimeAsync(350))
+    expect(saveDraft).toHaveBeenCalledOnce()
+  })
 })

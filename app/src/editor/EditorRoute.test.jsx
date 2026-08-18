@@ -20,11 +20,14 @@ vi.mock('../lib/quantize', () => ({
   revokeImage: vi.fn(),
 }))
 vi.mock('./ChartEditor', () => ({
-  default: ({ draft, onGenerate }) => (
-    <>
+  default: ({ draft, error, onBack, onGenerate, onPersistError }) => (
+    <main className="editor-screen">
       <div>Editing {draft.name}</div>
       <button type="button" onClick={() => onGenerate(draft)}>Generate chart</button>
-    </>
+      <button type="button" onClick={() => onBack(draft)}>Back to charts</button>
+      <button type="button" onClick={() => onPersistError(new Error('disk full'))}>Simulate save failure</button>
+      {error && <div className="editor-action-alert" role="alert">{error}</div>}
+    </main>
   ),
 }))
 
@@ -61,6 +64,7 @@ describe('EditorRoute', () => {
 
     expect(await screen.findByRole('button', { name: 'Choose a photo' })).toBeEnabled()
     expect(screen.getByText('Start a chart from a photo')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveClass('editor-import-back')
   })
 
   it('creates and persists a draft from the supplied initial file', async () => {
@@ -93,6 +97,16 @@ describe('EditorRoute', () => {
     render(<EditorRoute onBack={() => {}} onGenerated={() => {}} />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Your saved draft could not be restored.')
+    expect(screen.getByRole('button', { name: 'Choose a photo' })).toBeEnabled()
+  })
+
+  it('returns to the actionable import state when a persisted draft is malformed', async () => {
+    getLatestDraft.mockResolvedValue({ ...savedDraft, name: '' })
+
+    render(<EditorRoute onBack={() => {}} onGenerated={() => {}} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your saved draft could not be restored.')
+    expect(getAsset).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Choose a photo' })).toBeEnabled()
   })
 
@@ -171,7 +185,34 @@ describe('EditorRoute', () => {
     await screen.findByText('Editing Winter fox')
     fireEvent.click(screen.getByRole('button', { name: 'Generate chart' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Canvas unavailable')
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('Canvas unavailable')
+    expect(alert.closest('main.editor-screen')).not.toBeNull()
     expect(store.addProject).not.toHaveBeenCalled()
+  })
+
+  it('receives the current draft from Back before returning to the chart list', async () => {
+    const file = new File(['image'], 'winter-fox.png', { type: 'image/png' })
+    const onBack = vi.fn()
+
+    render(<EditorRoute initialFile={file} onBack={onBack} onGenerated={() => {}} />)
+    await screen.findByText('Editing Winter fox')
+    fireEvent.click(screen.getByRole('button', { name: 'Back to charts' }))
+
+    expect(onBack).toHaveBeenCalledWith()
+  })
+
+  it('keeps the editor open with an actionable error when an action save fails', async () => {
+    const file = new File(['image'], 'winter-fox.png', { type: 'image/png' })
+    const onBack = vi.fn()
+
+    render(<EditorRoute initialFile={file} onBack={onBack} onGenerated={() => {}} />)
+    await screen.findByText('Editing Winter fox')
+    fireEvent.click(screen.getByRole('button', { name: 'Simulate save failure' }))
+
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('Changes could not be saved. Please try again before leaving.')
+    expect(alert.closest('main.editor-screen')).not.toBeNull()
+    expect(onBack).not.toHaveBeenCalled()
   })
 })

@@ -145,6 +145,11 @@ button {
     border-color 200ms ease-out, opacity 200ms ease-out;
 }
 
+.chart-photo-chooser {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 /* Hide scrollbars on the chart + legend scrollers (touch surfaces) */
 .no-bar {
   scrollbar-width: none;

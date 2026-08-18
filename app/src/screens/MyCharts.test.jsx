@@ -8,6 +8,6 @@ it('offers images only and does not imply unsupported .pat parsing', () => {
   const { container } = render(<MyCharts onOpen={() => {}} onNew={() => {}} onImportFile={() => {}} />)
 
   expect(container.querySelector('input[type="file"]')).toHaveAttribute('accept', 'image/*')
-  expect(screen.getByText('OR CHOOSE AN EXISTING PHOTO')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'OR CHOOSE AN EXISTING PHOTO' })).toHaveClass('chart-photo-chooser')
   expect(screen.queryByText(/\.PAT/)).not.toBeInTheDocument()
 })

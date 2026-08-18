@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import ChartEditor from './ChartEditor'
 import { getAsset, getLatestDraft, saveAsset, saveDraft } from './draftRepository'
 import { createDraft, validateDraft } from './model'
+import './editor.css'
 
 const restoreError = 'Your saved draft could not be restored.'
 
@@ -105,6 +106,7 @@ export default function EditorRoute({ initialFile, onBack, onGenerated }) {
 
   const generate = (currentDraft) => {
     try {
+      setError(null)
       if (!image) throw new Error('The source image is no longer available.')
       const result = quantizeToGrid(image, currentDraft.grid.columns, 4, {
         rows: currentDraft.grid.rows,
@@ -129,18 +131,30 @@ export default function EditorRoute({ initialFile, onBack, onGenerated }) {
     }
   }
 
+  const leaveEditor = (_currentDraft) => {
+    onBack?.()
+  }
+
+  const reportPersistError = () => {
+    setError('Changes could not be saved. Please try again before leaving.')
+  }
+
   if (draft && image) {
     return (
-      <>
-        <ChartEditor draft={draft} image={image} onBack={onBack} onGenerate={generate} />
-        {error && <p role="alert">{error}</p>}
-      </>
+      <ChartEditor
+        draft={draft}
+        error={error}
+        image={image}
+        onBack={leaveEditor}
+        onGenerate={generate}
+        onPersistError={reportPersistError}
+      />
     )
   }
 
   return (
     <main className="screen pad" style={{ paddingTop: 66 }}>
-      <button type="button" onClick={onBack} aria-label="Back">‹</button>
+      <button className="editor-import-back" type="button" onClick={onBack} aria-label="Back">‹</button>
       <h1>Start a chart from a photo</h1>
       <p>Choose a clear image, then frame it and set the stitch grid.</p>
       {error && <p role="alert">{error}</p>}

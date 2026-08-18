@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import FrameStage from './FrameStage'
@@ -22,6 +22,15 @@ describe('FrameStage', () => {
 
     expect(screen.getByRole('slider', { name: /scale/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Recenter' })).toBeDisabled()
+  })
+
+  it('dispatches a crop scale adjustment', () => {
+    const dispatch = vi.fn()
+
+    render(<FrameStage draft={{ fitMode: 'crop', transform: { scale: 1 } }} dispatch={dispatch} />)
+    fireEvent.change(screen.getByRole('slider', { name: 'Scale' }), { target: { value: '2' } })
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'transform/patch', patch: { scale: 2 } })
   })
 
   it('dispatches rotate, flip, and reset frame actions', async () => {

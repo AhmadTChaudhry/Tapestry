@@ -137,13 +137,19 @@ export function validateDraft(value) {
     && typeof value.transform.flipY === 'boolean'
   const valid = value?.schemaVersion === EDITOR_SCHEMA_VERSION
     && typeof value.id === 'string'
+    && typeof value.name === 'string'
+    && value.name.trim().length > 0
     && typeof value.assetId === 'string'
     && sourceWidthValid
     && sourceHeightValid
     && (value.fitMode === 'crop' || value.fitMode === 'stretch')
     && columnsValid
     && rowsValid
+    && typeof value.grid?.dimensionsLocked === 'boolean'
+    && (value.grid?.gauge === 'true' || value.grid?.gauge === 'square')
+    && (value.grid?.workingMethod === 'round' || value.grid?.workingMethod === 'turned')
     && transformValid
+    && EDITOR_STAGES.includes(value.activeStage)
     && hasParseableTimestamp(value.createdAt)
     && hasParseableTimestamp(value.updatedAt)
   return valid ? { ok: true, draft: value } : { ok: false, reason: 'invalid-draft' }
