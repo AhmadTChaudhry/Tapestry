@@ -25,7 +25,7 @@ function openDatabase() {
   return dbPromise
 }
 
-export async function __transact(storeName, mode, operation) {
+async function transact(storeName, mode, operation) {
   const db = await openDatabase()
 
   return new Promise((resolve, reject) => {
@@ -58,25 +58,25 @@ export async function saveAsset(blob, dimensions) {
     mimeType: blob.type || 'application/octet-stream',
   }
 
-  await __transact('assets', 'readwrite', (store) => store.put(asset))
+  await transact('assets', 'readwrite', (store) => store.put(asset))
   return asset
 }
 
-export const getAsset = (id) => __transact('assets', 'readonly', (store) => store.get(id))
+export const getAsset = (id) => transact('assets', 'readonly', (store) => store.get(id))
 
 export async function saveDraft(draft) {
   const checked = validateDraft(draft)
   if (!checked.ok) throw new Error(checked.reason)
 
-  await __transact('drafts', 'readwrite', (store) => store.put(draft))
+  await transact('drafts', 'readwrite', (store) => store.put(draft))
   return draft
 }
 
-export const getDraft = (id) => __transact('drafts', 'readonly', (store) => store.get(id))
-export const deleteDraft = (id) => __transact('drafts', 'readwrite', (store) => store.delete(id))
+export const getDraft = (id) => transact('drafts', 'readonly', (store) => store.get(id))
+export const deleteDraft = (id) => transact('drafts', 'readwrite', (store) => store.delete(id))
 
 export async function getLatestDraft() {
-  const drafts = await __transact('drafts', 'readonly', (store) => store.getAll())
+  const drafts = await transact('drafts', 'readonly', (store) => store.getAll())
   const updatedAt = (draft) => {
     const timestamp = Date.parse(draft?.updatedAt)
     return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY

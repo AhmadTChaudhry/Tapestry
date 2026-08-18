@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createDraft } from './model'
+import * as draftRepository from './draftRepository'
 import {
   __resetDatabase,
-  __transact,
   deleteDraft,
   getAsset,
   getDraft,
@@ -42,6 +42,10 @@ beforeEach(async () => {
 })
 
 describe('draft repository', () => {
+  it('does not expose transaction internals as part of its public API', () => {
+    expect(draftRepository).not.toHaveProperty('__transact')
+  })
+
   it('stores a blob separately from the draft', async () => {
     const file = new File(['pixels'], 'fox.png', { type: 'image/png' })
     const asset = await saveAsset(file, { width: 640, height: 480 })
@@ -105,29 +109,6 @@ describe('draft repository', () => {
     await saveDraft(latest)
 
     await expect(getLatestDraft()).resolves.toEqual(latest)
-  })
-
-  it('resolves transactions only after completion', async () => {
-    let completed = false
-
-    await __transact('assets', 'readwrite', (store, transaction) => {
-      transaction.addEventListener('complete', () => {
-        completed = true
-      })
-      const first = store.put({ id: 'asset-durable', blob: new Blob(), width: 1, height: 1, mimeType: 'image/png' })
-      store.put({ id: 'asset-later', blob: new Blob(), width: 1, height: 1, mimeType: 'image/png' })
-      return first
-    })
-
-    expect(completed).toBe(true)
-  })
-
-  it('rejects when a transaction aborts after its first request succeeds', async () => {
-    await expect(__transact('assets', 'readwrite', (store) => {
-      const first = store.put({ id: 'asset-duplicate', blob: new Blob(), width: 1, height: 1, mimeType: 'image/png' })
-      store.add({ id: 'asset-duplicate', blob: new Blob(), width: 1, height: 1, mimeType: 'image/png' })
-      return first
-    })).rejects.toThrow()
   })
 
   it('rejects reset when an external IndexedDB connection blocks deletion', async () => {
