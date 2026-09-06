@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useStore } from '../store'
 import { percentDone } from '../lib/chart'
 import MiniChart from '../components/MiniChart'
+import { StitchSampler, StitchesMark } from '../components/BrandMark'
 import './home-library.css'
 
 export default function Home({ onOpen, onNew, onImportFile, onSeeAll }) {
@@ -13,7 +14,10 @@ export default function Home({ onOpen, onNew, onImportFile, onSeeAll }) {
     <main className="screen screen--tab library-screen">
       <div className="library-scroll">
         <header className="library-heading">
-          <h1>Tapestry</h1>
+          <div className="library-heading-row">
+            <div className="library-brand-lockup"><StitchesMark /><div><h1>Stitches</h1><span className="library-subtitle">Tapestry</span></div></div>
+            <StitchSampler />
+          </div>
           <p>{projects.length ? `${projects.length} ${projects.length === 1 ? 'project' : 'projects'} in your library` : 'Your next project starts here'}</p>
         </header>
         {current ? (

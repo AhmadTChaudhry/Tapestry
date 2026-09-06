@@ -1,4 +1,5 @@
 import './Welcome.css'
+import { StitchesMark } from './BrandMark'
 
 const motif = [
   '0000000000000000', '0001100000110000', '0001210001210000',
@@ -27,7 +28,7 @@ export function StitchTulip() {
 
 export default function Welcome({ onContinue, onNew }) {
   return <main className="welcome-screen">
-    <div className="welcome-brand"><span className="thread-mark" aria-hidden="true">✳</span> tapestry</div>
+    <div className="welcome-brand"><StitchesMark /><span className="welcome-brand-lockup"><strong>Stitches</strong><small>Tapestry</small></span></div>
     <div className="welcome-art"><StitchTulip /></div>
     <div className="welcome-copy">
       <h1>A little picture.<br />A lot of possibility.</h1>
@@ -36,7 +37,6 @@ export default function Welcome({ onContinue, onNew }) {
     <div className="welcome-actions">
       <button className="pill-primary" onClick={onContinue}>Open my charts</button>
       <button className="welcome-new" onClick={onNew}>Start with a photo</button>
-      <small>Made for a hook in one hand.</small>
     </div>
   </main>
 }

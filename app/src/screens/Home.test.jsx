@@ -40,6 +40,9 @@ describe('Home', () => {
     store.projects = []
     render(<Home onOpen={vi.fn()} onNew={vi.fn()} onImportFile={vi.fn()} onSeeAll={vi.fn()} />)
 
+    expect(screen.getByRole('heading', { name: 'Stitches' })).toBeVisible()
+    expect(screen.getByText('Tapestry')).toBeVisible()
+    expect(screen.getByRole('img', { name: 'A playful stitch sampler' })).toBeVisible()
     expect(screen.getByText('Nothing in progress yet')).toBeVisible()
     expect(screen.getByText('Your next project starts here')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Choose an existing photo' })).toBeVisible()
