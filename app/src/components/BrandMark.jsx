@@ -8,9 +8,7 @@ export function StitchesMark({ className = '' }) {
       aria-hidden="true"
     >
       <rect x="1" y="1" width="46" height="46" rx="16" fill="#FFFDFB" stroke="#DDD4E5" strokeWidth="1.5" />
-      <path d="M32.5 12.5c-3.8-3.4-11.2-3.8-15.2-.6-4.8 3.9-2.2 8.2 3 10.1l6.4 2.3c5.5 2 7.5 6.4 3.1 10.2-4.2 3.6-11.9 2.7-15.8-1.4" stroke="#724C80" strokeWidth="4.2" strokeLinecap="round" />
-      <path d="M13.5 13.5l3.2 4 3.2-4m-6.4 17 3.2 4 3.2-4m9.8-21 3.2 4 3.2-4m-6.4 17 3.2 4 3.2-4" stroke="#F2B89F" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="11.5" cy="36.5" r="2.3" fill="#8EA99B" />
+      <path d="m10 16 7 8 7-8m-14 12 7 8 7-8m0-12 7 8 7-8" stroke="#724C80" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
