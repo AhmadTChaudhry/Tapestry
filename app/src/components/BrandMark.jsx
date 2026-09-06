@@ -28,13 +28,11 @@ export function StitchSampler() {
       {cells.flatMap((row, y) => row.map((color, x) => (
         <path
           key={`${x}-${y}`}
-          d="M15 1c2-3 5 0 6 3v6c-3-2-5-5-6-9m12 0c-1-3-4 0-6 3v6c3-2 5-5 6-9"
+          d="M1 1c2-3 5 0 6 3v6c-3-2-5-5-6-9m12 0c-1-3-4 0-6 3v6c3-2 5-5 6-9"
           transform={`translate(${14 + x * 14} ${15 + y * 14})`}
           fill={color}
         />
       )))}
-      <path d="M20 82c10 8 24 8 33 0 7-6 16-6 23 0" stroke="#724C80" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 4" />
-      <circle cx="76" cy="81" r="3" fill="#B4553C" />
     </svg>
   )
 }
