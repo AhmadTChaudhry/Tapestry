@@ -198,9 +198,8 @@
   pointer-events: none;
 }
 
-/* Controls sit flat on the sheet's own paper colour, the same figure/ground
-   ImportGrid's Field rows use — a white card here read as a stray surface
-   dropped onto the app rather than part of it. */
+/* Controls sit flat on the sheet's own paper colour: a white card here read
+   as a stray surface dropped onto the app rather than part of it. */
 .editor-controls {
   display: grid;
   gap: 18px;
