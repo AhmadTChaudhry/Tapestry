@@ -21,6 +21,41 @@ function openExternalDatabase() {
   })
 }
 
+async function readAssetRecord(id) {
+  const db = await openExternalDatabase()
+
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = db.transaction('assets', 'readonly')
+      let result
+      const request = transaction.objectStore('assets').get(id)
+      request.onsuccess = () => { result = request.result }
+      request.onerror = () => reject(request.error)
+      transaction.oncomplete = () => resolve(result)
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+async function putAssetRecord(asset) {
+  const db = await openExternalDatabase()
+
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction('assets', 'readwrite')
+      transaction.objectStore('assets').put(asset)
+      transaction.oncomplete = resolve
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
 async function putDraftDirectly(draft) {
   const db = await openExternalDatabase()
 
@@ -66,6 +101,32 @@ describe('draft repository', () => {
       mimeType: 'image/png',
     })
     expect((await getLatestDraft()).name).toBe('Fox')
+  })
+
+  it('stores picked image bytes as an ArrayBuffer instead of a File or Blob', async () => {
+    const asset = await saveAsset(new File(['pixels'], 'fox.png', { type: 'image/png' }), { width: 640, height: 480 })
+    const stored = await readAssetRecord(asset.id)
+
+    expect(stored).not.toHaveProperty('blob')
+    expect(stored.data).toHaveProperty('byteLength', 6)
+    expect(new TextDecoder().decode(stored.data)).toBe('pixels')
+  })
+
+  it('hydrates an ArrayBuffer-backed asset as a Blob when reading it', async () => {
+    await saveAsset(new Blob(['seed'], { type: 'image/png' }), { width: 1, height: 1 })
+    await putAssetRecord({
+      id: 'asset-array-buffer',
+      data: new TextEncoder().encode('pixels').buffer,
+      width: 640,
+      height: 480,
+      mimeType: 'image/png',
+    })
+
+    const asset = await getAsset('asset-array-buffer')
+
+    expect(asset.blob).toBeInstanceOf(Blob)
+    expect(asset.blob.type).toBe('image/png')
+    expect(await asset.blob.text()).toBe('pixels')
   })
 
   it('retrieves a saved draft by id', async () => {

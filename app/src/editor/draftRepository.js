@@ -58,7 +58,18 @@ async function transact(storeName, mode, operation) {
   })
 }
 
+function hydrateAsset(record) {
+  if (!record || record.blob || record.data === undefined) return record
+
+  const { data, ...asset } = record
+  return {
+    ...asset,
+    blob: new Blob([data], { type: asset.mimeType || 'application/octet-stream' }),
+  }
+}
+
 export async function saveAsset(blob, dimensions) {
+  const data = await blob.arrayBuffer()
   const asset = {
     id: `asset-${crypto.randomUUID()}`,
     blob,
@@ -66,12 +77,19 @@ export async function saveAsset(blob, dimensions) {
     height: dimensions.height,
     mimeType: blob.type || 'application/octet-stream',
   }
+  const record = {
+    id: asset.id,
+    data,
+    width: asset.width,
+    height: asset.height,
+    mimeType: asset.mimeType,
+  }
 
-  await transact('assets', 'readwrite', (store) => store.put(asset))
+  await transact('assets', 'readwrite', (store) => store.put(record))
   return asset
 }
 
-export const getAsset = (id) => transact('assets', 'readonly', (store) => store.get(id))
+export const getAsset = async (id) => hydrateAsset(await transact('assets', 'readonly', (store) => store.get(id)))
 
 export async function saveDraft(draft) {
   const checked = validateDraft(draft)
