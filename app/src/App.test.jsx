@@ -18,6 +18,7 @@ it('shows a dismissible welcome once per browser session', () => {
   expect(screen.getByText('Stitches')).toBeVisible()
   expect(screen.getByText('Tapestry')).toBeVisible()
   expect(screen.getByTestId('stitches-mark')).toBeVisible()
+  expect(screen.getByTestId('stitches-mark').querySelector('rect')).toBeNull()
   expect(screen.queryByText('Made for a hook in one hand.')).not.toBeInTheDocument()
   expect(screen.getByRole('img', { name: 'A tulip made of crochet stitches' })).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Open my charts' }))

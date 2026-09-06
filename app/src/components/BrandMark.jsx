@@ -7,7 +7,6 @@ export function StitchesMark({ className = '' }) {
       fill="none"
       aria-hidden="true"
     >
-      <rect x="1" y="1" width="46" height="46" rx="16" fill="#FFFDFB" stroke="#DDD4E5" strokeWidth="1.5" />
       <path d="m10 16 7 8 7-8m-14 12 7 8 7-8m0-12 7 8 7-8" stroke="#724C80" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
