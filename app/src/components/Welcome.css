@@ -1,0 +1,25 @@
+.welcome-screen {
+  min-height: 100svh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: max(28px, env(safe-area-inset-top)) 28px max(20px, env(safe-area-inset-bottom));
+  color: #302742;
+  background: #F3F0FA;
+  text-align: center;
+  overflow: auto;
+}
+.welcome-brand { display: flex; align-items: center; gap: 8px; font-size: 25px; font-weight: 700; letter-spacing: -.8px; }
+.thread-mark { font-size: 28px; font-weight: 400; color: #724C80; }
+.welcome-art { flex: 1; min-height: 190px; display: flex; align-items: center; justify-content: center; padding: 12px 0; width: 100%; }
+.stitch-tulip { width: min(64vw, 248px); max-height: 33dvh; overflow: visible; transform: rotate(-5deg); filter: drop-shadow(0 12px 12px #3027420d); animation: textile-arrive 650ms ease-out both; }
+.welcome-copy h1 { margin: 0; font-size: clamp(28px, 8.4vw, 36px); line-height: 1.17; font-weight: 650; letter-spacing: -1.4px; }
+.welcome-copy p { margin: 16px 0 24px; color: #655B70; line-height: 1.65; font-size: 16px; }
+.welcome-actions { width: 100%; max-width: 380px; }
+.welcome-actions .pill-primary { min-height: 58px; border-radius: 20px; background: #724C80; }
+.welcome-new { display: block; min-height: 52px; margin: 8px auto; font-weight: 600; font-size: 16px; }
+.welcome-actions small { display: block; color: #766B82; font-size: 12px; padding: 10px 0 0; }
+@keyframes textile-arrive { from { opacity: 0; transform: rotate(-1deg) scale(.94); } to { opacity: 1; transform: rotate(-5deg) scale(1); } }
+@media (max-height: 680px) { .welcome-screen { padding-top: max(16px, env(safe-area-inset-top)); } .welcome-art { min-height: 145px; padding: 8px 0; } .stitch-tulip { max-height: 26dvh; } .welcome-copy p { margin: 10px 0 16px; } .welcome-actions small { display: none; } }
+@media (prefers-reduced-motion: reduce) { .stitch-tulip { animation: none; } }

@@ -2,212 +2,67 @@ import { useRef } from 'react'
 import { useStore } from '../store'
 import { percentDone } from '../lib/chart'
 import MiniChart from '../components/MiniChart'
+import './home-library.css'
 
 export default function Home({ onOpen, onNew, onImportFile, onSeeAll }) {
-  const { projects } = useStore()
-  const fileRef = useRef(null)
+  const { projects: library } = useStore()
+  const projects = library.filter(p => !p.archived)
   const [current, ...rest] = projects
-
+  const fileRef = useRef(null)
   return (
-    <div className="screen screen--tab">
-      <div
-        className="pad no-bar"
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          paddingTop: 'max(66px, calc(env(safe-area-inset-top) + 22px))',
-          paddingBottom: 24,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 26,
-        }}
-      >
-        <header>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 32,
-              fontWeight: 600,
-              letterSpacing: '-0.02em',
-              color: 'var(--ink)',
-            }}
-          >
-            Home
-          </h1>
-          <span className="mono" style={{ fontSize: 12, color: 'var(--faint)' }}>
-            {projects.length > 0
-              ? `${projects.length} IN PROGRESS`
-              : 'NO CHARTS YET'}
-          </span>
+    <main className="screen screen--tab library-screen">
+      <div className="library-scroll">
+        <header className="library-heading">
+          <h1>Tapestry</h1>
+          <p>{projects.length ? `${projects.length} ${projects.length === 1 ? 'project' : 'projects'} in your library` : 'Your next project starts here'}</p>
         </header>
-
         {current ? (
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <h2 className="home-eyebrow">Continue</h2>
-            <ContinueCard project={current} onClick={() => onOpen(current.id)} />
+          <section className="home-continue" aria-labelledby="continue-heading">
+            <h2 id="continue-heading">Pick up where you left off</h2>
+            <button className="continue-project" type="button" onClick={() => onOpen(current.id)}>
+              <div className="continue-preview"><MiniChart project={current} size={196} /></div>
+              <div className="continue-description">
+                <span className="continue-project-name">{current.name}</span>
+                <span className="project-row">Row {current.currentRow} of {current.totalRows}</span>
+                <span className="project-progress" aria-hidden="true"><span style={{ width: `${percentDone(current)}%` }} /></span>
+                <span className="continue-footer"><span>{percentDone(current)}% complete</span><span className="continue-link">Continue chart <Chevron /></span></span>
+              </div>
+            </button>
           </section>
-        ) : (
-          <EmptyState />
-        )}
-
-        <button className="pill-primary press" onClick={onNew}>
-          + New chart from a photo
-        </button>
-
+        ) : <div className="library-empty"><EmptyStitches /><h2>Nothing in progress yet</h2><p>Turn a photo you love into a chart you can make, one row at a time.</p></div>}
         {rest.length > 0 && (
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <h2 className="home-eyebrow">Other charts</h2>
-              <button
-                className="mono press"
-                type="button"
-                onClick={onSeeAll}
-                style={{ fontSize: 11, color: 'var(--faint-2)', letterSpacing: '0.04em' }}
-              >
-                SEE ALL
-              </button>
-            </div>
-            <div
-              className="no-bar"
-              style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 2 }}
-            >
-              {rest.map((project) => (
-                <OtherChartCard key={project.id} project={project} onClick={() => onOpen(project.id)} />
-              ))}
+          <section className="other-projects" aria-labelledby="other-heading">
+            <div className="library-section-heading"><h2 id="other-heading">Other charts</h2><button type="button" onClick={onSeeAll}>See all</button></div>
+            <div className="other-projects-rail">
+              {rest.map(project => <button className="other-project" key={project.id} type="button" onClick={() => onOpen(project.id)}>
+                <div className="other-project-preview"><MiniChart project={project} size={104} /></div>
+                <span className="other-project-name">{project.name}</span><span>{percentDone(project)}% complete</span>
+              </button>)}
             </div>
           </section>
         )}
-
-        {projects.length === 0 && (
-          <button
-            className="chart-photo-chooser mono press"
-            onClick={() => fileRef.current?.click()}
-            style={{
-              fontSize: 11,
-              color: 'var(--faint-2)',
-              textAlign: 'center',
-              letterSpacing: '0.04em',
-            }}
-          >
-            OR CHOOSE AN EXISTING PHOTO
-          </button>
-        )}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            e.target.value = ''
-            if (f) onImportFile(f)
-          }}
-        />
       </div>
-    </div>
+      <div className="library-bottom-action">
+        <button className="library-new-photo" type="button" onClick={onNew}><PhotoIcon />New chart from a photo</button>
+        {!projects.length && <button className="chart-photo-chooser library-photo-link" type="button" onClick={() => fileRef.current?.click()}>Choose an existing photo</button>}
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" aria-label="Choose a photo" hidden onChange={event => {
+        const file = event.target.files?.[0]
+        event.target.value = ''
+        if (file) onImportFile(file)
+      }} />
+    </main>
   )
 }
 
-function ContinueCard({ project, onClick }) {
-  const pct = percentDone(project)
-  return (
-    <button
-      className="press"
-      onClick={onClick}
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 16,
-        padding: 16,
-        display: 'flex',
-        gap: 16,
-        alignItems: 'center',
-        textAlign: 'left',
-        width: '100%',
-        boxShadow: 'var(--shadow-card)',
-      }}
-    >
-      <MiniChart project={project} size={72} />
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: 'var(--ink)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {project.name}
-        </div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--faint)' }}>
-          ROW {project.currentRow} / {project.totalRows} · {pct}%
-        </div>
-        <div style={{ height: 4, borderRadius: 999, background: 'var(--sunken)', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)', borderRadius: 999 }} />
-        </div>
-      </div>
-      <span aria-hidden="true" style={{ color: 'var(--faint)', fontSize: 20, flexShrink: 0 }}>›</span>
-    </button>
-  )
+function Chevron() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m9 5 7 7-7 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
 }
 
-function OtherChartCard({ project, onClick }) {
-  const pct = percentDone(project)
-  return (
-    <button
-      className="press"
-      onClick={onClick}
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 14,
-        padding: 10,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        textAlign: 'left',
-        width: 108,
-        flexShrink: 0,
-        boxShadow: 'var(--shadow-card)',
-      }}
-    >
-      <MiniChart project={project} size={88} />
-      <div
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: 'var(--ink)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {project.name}
-      </div>
-      <span className="mono" style={{ fontSize: 10, color: 'var(--faint)' }}>{pct}%</span>
-    </button>
-  )
+export function PhotoIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="4" width="18" height="16" rx="4" /><circle cx="8.5" cy="9" r="1.5" /><path d="m4 17 5-5 4 4 3-3 5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
 }
 
-function EmptyState() {
-  return (
-    <div
-      style={{
-        border: '1px dashed var(--border-strong)',
-        borderRadius: 14,
-        padding: '32px 20px',
-        textAlign: 'center',
-        color: 'var(--body)',
-      }}
-    >
-      <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--ink)', marginBottom: 6 }}>
-        Nothing in progress yet
-      </div>
-      <div style={{ fontSize: 14, lineHeight: 1.45 }}>
-        Start with a photo — a bold, high-contrast one turns into the clearest chart.
-      </div>
-    </div>
-  )
+function EmptyStitches() {
+  return <svg className="empty-stitches" aria-hidden="true" viewBox="0 0 100 100" fill="none" strokeWidth="8" strokeLinecap="round"><path stroke="#B8CBC1" d="m22 25 12 12 12-12m8 0 12 12 12-12m-56 20 12 12 12-12" /><path stroke="#F2B89F" d="m54 45 12 12 12-12m-56 20 12 12 12-12" /><path stroke="#724C80" d="m54 65 12 12 12-12" /></svg>
 }

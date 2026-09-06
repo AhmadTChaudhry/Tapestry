@@ -1,0 +1,10 @@
+{
+  "name": "Tapestry Crochet Charts",
+  "short_name": "Tapestry",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F3F0FA",
+  "theme_color": "#F3F0FA",
+  "icons": [{ "src": "crochet-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

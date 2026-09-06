@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import EditorRoute from './EditorRoute'
 import { loadImageFile, quantizeToGrid, revokeImage } from '../lib/quantize'
-import { getAsset, getLatestDraft, saveAsset, saveDraft } from './draftRepository'
+import { getAsset, getDraft, getLatestDraft, saveAsset, saveDraft } from './draftRepository'
 
 const store = vi.hoisted(() => ({ upsertProject: vi.fn(), projects: [] }))
 
@@ -11,6 +11,7 @@ vi.mock('./draftRepository', () => ({
   saveAsset: vi.fn(),
   saveDraft: vi.fn(),
   getAsset: vi.fn(),
+  getDraft: vi.fn(),
   getLatestDraft: vi.fn(() => Promise.resolve(null)),
 }))
 vi.mock('../store', () => ({
@@ -224,6 +225,21 @@ describe('EditorRoute', () => {
     expect(onGenerated).toHaveBeenCalledWith('p-existing')
   })
 
+  it.each([1, [1, 3]])('preserves a started pattern when regenerating (completedRows=%j)', async completedRows => {
+    getDraft.mockResolvedValue(savedDraft)
+    getAsset.mockResolvedValue({ ...asset, blob: new Blob(['image']) })
+    const existing = { id: 'started', editorDraftId: savedDraft.id, currentRow: 1, completedRows, totalRows: 40, grid: [[0]] }
+    store.projects = [existing]
+    render(<EditorRoute initialDraftId={savedDraft.id} onBack={() => {}} onGenerated={() => {}} />)
+    await screen.findByText('Editing Recovered fox')
+    fireEvent.click(screen.getByRole('button', { name: 'Generate chart' }))
+    const generated = store.upsertProject.mock.calls[0][0]
+    expect(generated.id).not.toBe(existing.id)
+    expect(generated).toMatchObject({ versionOf: existing.id, sourceDraftId: savedDraft.id, completedRows: 0, currentRow: 1 })
+    expect(existing.completedRows).toEqual(completedRows)
+    expect(existing.grid).toEqual([[0]])
+  })
+
   it('generates with the chosen palette size and yarn overrides', async () => {
     const file = new File(['image'], 'winter-fox.png', { type: 'image/png' })
     quantizeToGrid.mockReturnValue({ grid: [[0, 1]], colors: ['#111111', '#222222'], roles: ['Background', 'Foreground'] })
@@ -241,7 +257,7 @@ describe('EditorRoute', () => {
       colors: ['#111111', '#222222'],
       // nobody visited the Yarn stage, so the label still falls back to
       // what part the colour plays rather than staying blank
-      yarnLabels: ['Background', 'Foreground'],
+      yarnLabels: ['A', 'B'],
     }))
   })
 

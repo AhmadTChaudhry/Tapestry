@@ -4,7 +4,7 @@
  * 1. Draw the image into a canvas resampled to stitchesWide x rows. Because a
  *    tapestry stitch is wider than it is tall, the row count is derived from the
  *    image aspect corrected by GAUGE_RATIO, so the motif isn't squashed.
- * 2. Median-cut the resampled pixels into `colorCount` clusters.
+ * 2. Cluster sampled pixels perceptually, preserving distinctive accents.
  * 3. Rank clusters dark -> light. The grid stores ranks; the matching colours
  *    are returned alongside it — they are the photo's own colours, averaged
  *    over each cluster.
@@ -47,7 +47,7 @@ function samplePixels(img, w, h, options = {}) {
   c.width = w
   c.height = h
   const ctx = c.getContext('2d', { willReadFrequently: true })
-  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingEnabled = options.draft?.image?.sampling !== 'pixel'
   ctx.imageSmoothingQuality = 'high'
   if (options.draft) drawDraftToCanvas(ctx, img, options.draft)
   else ctx.drawImage(img, 0, 0, w, h)
@@ -70,49 +70,57 @@ function samplePixels(img, w, h, options = {}) {
   return px
 }
 
-function medianCut(pixels, count) {
-  let boxes = [pixels]
-  while (boxes.length < count) {
-    // split the box with the largest spread along its widest channel
-    let target = -1
-    let bestSpread = -1
-    let bestChannel = 0
-    boxes.forEach((box, bi) => {
-      if (box.length < 2) return
-      for (let ch = 0; ch < 3; ch++) {
-        let min = 255
-        let max = 0
-        for (const p of box) {
-          if (p[ch] < min) min = p[ch]
-          if (p[ch] > max) max = p[ch]
-        }
-        const spread = (max - min) * box.length ** 0.25
-        if (spread > bestSpread) {
-          bestSpread = spread
-          target = bi
-          bestChannel = ch
-        }
-      }
-    })
-    if (target < 0) break
-    const box = boxes[target].slice().sort((a, b) => a[bestChannel] - b[bestChannel])
-    const mid = Math.floor(box.length / 2)
-    boxes.splice(target, 1, box.slice(0, mid), box.slice(mid))
-  }
-  return boxes
-    .filter((b) => b.length)
-    .map((box) => {
-      const sum = [0, 0, 0]
-      for (const p of box) {
-        sum[0] += p[0]
-        sum[1] += p[1]
-        sum[2] += p[2]
-      }
-      return sum.map((s) => s / box.length)
-    })
-}
-
 const lum = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+export const fromHex = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+
+// Oklab keeps perceptually similar shades close, unlike raw RGB distance.
+export function perceptualColor(rgb) {
+  const [r, g, b] = rgb.map(v => v / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+  const l = Math.cbrt(0.4122214708*r + 0.5363325363*g + 0.0514459929*b)
+  const m = Math.cbrt(0.2119034982*r + 0.6806995451*g + 0.1073969566*b)
+  const s = Math.cbrt(0.0883024619*r + 0.2817188376*g + 0.6299787005*b)
+  return [0.2104542553*l + 0.793617785*m - 0.0040720468*s, 1.9779984951*l - 2.428592205*m + 0.4505937099*s, 0.0259040371*l + 0.7827717662*m - 0.808675766*s]
+}
+export const colorDistance = (a, b) => a.reduce((sum, v, i) => sum + (v - b[i]) ** 2, 0)
+
+function photoPalette(pixels, count) {
+  const histogram = new Map()
+  for (const rgb of pixels) {
+    const key = rgb.join(',')
+    const entry = histogram.get(key)
+    if (entry) entry.count++
+    else histogram.set(key, { rgb, lab: perceptualColor(rgb), count: 1 })
+  }
+  const samples = [...histogram.values()].sort((a, b) => b.count - a.count)
+  if (!samples.length) return [[255, 255, 255]]
+  // Weighted farthest-point seeding gives a small, distinctive accent a
+  // chance to survive instead of splitting only populous neutral regions.
+  const centers = [samples[0].rgb]
+  while (centers.length < Math.min(count, samples.length)) {
+    const labs = centers.map(perceptualColor)
+    let best, score = 0
+    for (const sample of samples) {
+      const error = Math.min(...labs.map(c => colorDistance(sample.lab, c))) * Math.sqrt(sample.count)
+      if (error > score) { score = error; best = sample.rgb }
+    }
+    if (!best) break
+    centers.push(best)
+  }
+  for (let iteration = 0; iteration < 5; iteration++) {
+    const labs = centers.map(perceptualColor)
+    const buckets = centers.map(() => ({ total: 0, rgb: [0, 0, 0] }))
+    for (const sample of samples) {
+      let nearest = 0
+      for (let i = 1; i < labs.length; i++) if (colorDistance(sample.lab, labs[i]) < colorDistance(sample.lab, labs[nearest])) nearest = i
+      const bucket = buckets[nearest]
+      bucket.total += sample.count
+      sample.rgb.forEach((v, i) => { bucket.rgb[i] += v * sample.count })
+    }
+    buckets.forEach((bucket, i) => { if (bucket.total) centers[i] = bucket.rgb.map(v => v / bucket.total) })
+  }
+  return centers
+}
 
 /**
  * Names each colour by the part it plays in the photo, not just its rank, so
@@ -162,14 +170,36 @@ export function quantizeToGrid(img, stitchesWide, colorCount, options = {}) {
   const rows = options.rows ?? rowsForImage(img.width, img.height, stitchesWide)
   const px = samplePixels(img, stitchesWide, rows, options)
 
-  const centroids = medianCut(px, colorCount).sort((a, b) => lum(a) - lum(b))
+  let centroids
+  if (options.palette?.length) centroids = options.palette.map(fromHex)
+  else if (options.draft?.image?.sampling === 'pixel') {
+    const unique = new Map(px.map(p => [toHex(p), p]))
+    if (unique.size > 64) throw new Error('This image has more than 64 sampled colours. Choose Photo mode to reduce its palette.')
+    centroids = [...unique.values()].sort((a, b) => lum(a) - lum(b))
+  } else {
+    centroids = photoPalette(px, colorCount).sort((a, b) => lum(a) - lum(b))
+    const locked = [...new Set(options.lockedColors || [])].map(fromHex)
+    for (const color of locked) {
+      if (!centroids.length) break
+      let nearestIndex = 0
+      centroids.forEach((c, i) => {
+        if (colorDistance(perceptualColor(c), perceptualColor(color)) < colorDistance(perceptualColor(centroids[nearestIndex]), perceptualColor(color))) nearestIndex = i
+      })
+      centroids.splice(nearestIndex, 1)
+    }
+    const threshold = Number(options.draft?.image?.mergeThreshold || 0)
+    if (threshold > 0) centroids = centroids.filter((c, i, all) => !all.slice(0, i).some(other => colorDistance(perceptualColor(c), perceptualColor(other)) < threshold ** 2))
+    centroids = [...locked, ...centroids].sort((a, b) => lum(a) - lum(b))
+  }
+  centroids = centroids.filter((c, i, all) => all.findIndex(other => toHex(other) === toHex(c)) === i)
+  const perceptualCentroids = centroids.map(perceptualColor)
 
   const nearest = (p) => {
+    const perceptual = perceptualColor(p)
     let best = 0
     let bestD = Infinity
     for (let i = 0; i < centroids.length; i++) {
-      const c = centroids[i]
-      const d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2
+      const d = colorDistance(perceptual, perceptualCentroids[i])
       if (d < bestD) {
         bestD = d
         best = i
@@ -192,11 +222,14 @@ export function quantizeToGrid(img, stitchesWide, colorCount, options = {}) {
     }
     grid.push(row)
   }
+  const used = counts.map((count, i) => count > 0 ? i : -1).filter(i => i >= 0)
+  const remap = new Map(used.map((index, i) => [index, i]))
   return {
-    grid,
+    grid: grid.map(row => row.map(i => remap.get(i))),
     rows,
-    colors: centroids.map(toHex),
-    roles: assignColorRoles(counts, edgeCounts),
+    colors: used.map(i => toHex(centroids[i])),
+    counts: used.map(i => counts[i]),
+    roles: assignColorRoles(used.map(i => counts[i]), used.map(i => edgeCounts[i])),
   }
 }
 

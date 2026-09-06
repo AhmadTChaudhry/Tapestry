@@ -1,64 +1,106 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { seedProjects } from './lib/seed'
 import { clampRow } from './lib/chart'
+import { normalizeProject, parseBackup, serializeBackup, downloadFile, saveLibrary, MAX_PROJECTS } from './lib/backup'
+import './components/ProjectTools.css'
 
 const KEY = 'tapestry-crochet/v1'
 
-const greyRamp = (n) =>
-  Array.from({ length: n }, (_, i) => {
-    const v = Math.round((i / Math.max(1, n - 1)) * 220 + 20)
-    return '#' + v.toString(16).padStart(2, '0').repeat(3).toUpperCase()
-  })
-
 function load() {
+  let raw = null
   try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    // an empty list is a valid saved state — only fall back to seeds when
-    // there is nothing usable stored at all
-    if (!Array.isArray(parsed?.projects)) return null
-    // Projects saved before colours moved onto the project itself (they used to
-    // point at a shared yarn colorway) get a neutral ramp so they still open.
-    return {
-      ...parsed,
-      projects: parsed.projects.map((p) =>
-        Array.isArray(p.colors) ? p : { ...p, colors: greyRamp(p.colorCount || 4) },
-      ),
-    }
-  } catch {
-    return null
+    raw = localStorage.getItem(KEY)
+    const parsed = raw ? JSON.parse(raw) : {}
+    const projects = raw ? parseBackup(raw, { legacy: true }).map((p, i) => ({ ...parsed.projects[i], ...p })) : seedProjects.map(p => normalizeProject(p))
+    return { raw, state: { gauge: 'true', gaps: true, theme: 'light', ...parsed, projects }, error: null }
+  } catch (error) {
+    return { raw, state: { projects: [], gauge: 'true', gaps: true, theme: 'light' }, error: `Saved library could not be loaded: ${error.message}` }
   }
 }
-
-const initial = () =>
-  load() || {
-    projects: seedProjects,
-    gauge: 'true', // 'true' (aran) | 'square'
-    gaps: true, // false draws the chart as continuous fabric, no cell separation
-    theme: 'light',
-  }
 
 const Ctx = createContext(null)
 
 export function StoreProvider({ children }) {
-  const [state, setState] = useState(initial)
+  const [loaded] = useState(load)
+  const [state, setRenderedState] = useState(loaded.state)
+  const [persistenceError, setPersistenceError] = useState(loaded.error)
+  const expected = useRef(loaded.raw)
+  const blockedLoad = useRef(Boolean(loaded.error))
+  const stateRef = useRef(state)
+  const setState = useCallback(update => {
+    const next = typeof update === 'function' ? update(stateRef.current) : update
+    stateRef.current = next
+    setRenderedState(next)
+  }, [])
+  const persist = useCallback(() => {
+    const write = () => {
+      if (blockedLoad.current) return
+      try {
+        expected.current = saveLibrary(localStorage, KEY, stateRef.current, expected.current)
+        setPersistenceError(null)
+      } catch (error) {
+        setPersistenceError(error.message || 'Device storage is unavailable.')
+      }
+    }
+    // Cooperating tabs serialize comparison + write where Web Locks is available.
+    // Older browsers still compare the full saved snapshot before each write.
+    if (navigator.locks?.request) navigator.locks.request(KEY, write).catch(error => setPersistenceError(error.message))
+    else write()
+  }, [])
 
   // Persist on every change — the current row is the most important state in
   // the app and must survive a kill, not wait for an exit hook.
   useEffect(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(state))
-    } catch {
-      /* quota / private mode — the chart still works for this session */
+    persist()
+  }, [state, persist])
+
+  useEffect(() => {
+    const onStorage = (event) => {
+      if ((event.key === KEY || event.key === null) && event.newValue !== expected.current) {
+        setPersistenceError('Another tab changed this library. Export your work, then load the saved library.')
+      }
     }
-  }, [state])
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  const reloadSaved = () => {
+    const next = load()
+    if (next.error) { setPersistenceError(next.error); return }
+    expected.current = next.raw
+    blockedLoad.current = false
+    setState(next.state)
+    setPersistenceError(null)
+  }
+  const addProject = useCallback((project) => {
+    const normalized = { ...project, ...normalizeProject(project, { fresh: true }) }
+    if (stateRef.current.projects.length >= MAX_PROJECTS) throw new Error('Library limit is 200 projects.')
+    if (stateRef.current.projects.some(p => p.id === normalized.id)) throw new Error('Project ID already exists.')
+    parseBackup(serializeBackup([normalized, ...stateRef.current.projects]))
+    setState(s => ({ ...s, projects: [normalized, ...s.projects] }))
+    return normalized
+  }, [])
+  const importProjects = useCallback((input) => {
+    const parsed = parseBackup(typeof input === 'string' ? input : JSON.stringify({ projects: input }))
+    const ids = new Map(parsed.map(p => [p.id, crypto.randomUUID()]))
+    const projects = parsed.map(p => {
+      const copy = { ...p, id: ids.get(p.id) }
+      // The backup contains charts, not the local IndexedDB photo/draft assets.
+      delete copy.editorDraftId
+      if (ids.has(copy.versionOf)) copy.versionOf = ids.get(copy.versionOf)
+      return copy
+    })
+    // Validate combined bounds before making an atomic, additive import.
+    parseBackup(serializeBackup([...projects, ...stateRef.current.projects]))
+    setState(s => ({ ...s, projects: [...projects, ...s.projects] }))
+    return projects
+  }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = state.theme
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', state.theme === 'dark' ? '#14120F' : '#F7F3EC')
+      ?.setAttribute('content', state.theme === 'dark' ? '#241E2D' : '#F3F0FA')
   }, [state.theme])
 
   const patchProject = useCallback((id, patch) => {
@@ -73,6 +115,11 @@ export function StoreProvider({ children }) {
   const value = useMemo(
     () => ({
       ...state,
+      patchProject,
+      addProject,
+      importProjects,
+      persistenceError,
+      retryPersistence: persist,
       setGauge: (gauge) => setState((s) => ({ ...s, gauge })),
       toggleGaps: () => setState((s) => ({ ...s, gaps: s.gaps === false })),
       toggleTheme: () =>
@@ -81,23 +128,21 @@ export function StoreProvider({ children }) {
         patchProject(id, (p) => ({
           currentRow: clampRow(p, typeof n === 'function' ? n(p.currentRow) : n),
         })),
-      addProject: (project) =>
-        setState((s) => ({ ...s, projects: [project, ...s.projects] })),
-      // Regenerating an editor draft replaces the chart it already produced
-      // rather than stacking another copy of it on the list. Row progress is
-      // kept where the new grid still reaches it.
+      // The editor chooses whether a regeneration retains its ID or becomes
+      // a new version. Only that exact project may be replaced here.
       upsertProject: (project) =>
         setState((s) => {
-          const index = s.projects.findIndex(
-            (p) =>
-              p.id === project.id ||
-              (project.editorDraftId && p.editorDraftId === project.editorDraftId),
-          )
-          if (index === -1) return { ...s, projects: [project, ...s.projects] }
+          const index = s.projects.findIndex(p => p.id === project.id)
+          if (index === -1) {
+            const projects = [{ ...project, ...normalizeProject(project, { fresh: true }) }, ...s.projects]
+            parseBackup(serializeBackup(projects))
+            return { ...s, projects }
+          }
 
           const existing = s.projects[index]
           const merged = { ...existing, ...project, id: existing.id }
-          merged.currentRow = clampRow(merged, existing.currentRow)
+          merged.currentRow = clampRow(merged, project.currentRow ?? existing.currentRow)
+          Object.assign(merged, normalizeProject(merged))
           const projects = [...s.projects]
           projects[index] = merged
           return { ...s, projects }
@@ -105,10 +150,16 @@ export function StoreProvider({ children }) {
       removeProject: (id) =>
         setState((s) => ({ ...s, projects: s.projects.filter((p) => p.id !== id) })),
     }),
-    [state, patchProject],
+    [state, patchProject, addProject, importProjects, persistenceError, persist],
   )
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={value}>{persistenceError && <aside className="persistence-warning" role="alert">
+    <strong>Your changes may not be saved.</strong><span>{persistenceError}</span>
+    <button onClick={blockedLoad.current ? reloadSaved : persist}>Retry saving / loading</button>
+    <button onClick={() => downloadFile('crochet-library.json', serializeBackup(state.projects))}>Export current library</button>
+    {loaded.raw && <button onClick={() => downloadFile('crochet-original-storage.json', loaded.raw)}>Download original saved data</button>}
+    <button onClick={reloadSaved}>Load saved library (discard session changes)</button>
+  </aside>}{children}</Ctx.Provider>
 }
 
 export const useStore = () => useContext(Ctx)

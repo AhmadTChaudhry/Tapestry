@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import App from './App'
 
 vi.mock('./store', () => ({ StoreProvider: ({ children }) => children }))
@@ -9,6 +9,24 @@ vi.mock('./screens/Home', () => ({
 vi.mock('./screens/MyCharts', () => ({ default: () => <div>Charts list</div> }))
 vi.mock('./editor/EditorRoute', () => ({ default: () => <div>Photo editor route</div> }))
 vi.mock('./screens/ChartScreen', () => ({ default: () => <div>Chart screen</div> }))
+
+beforeEach(() => sessionStorage.setItem('tapestry-welcome/v1', 'seen'))
+
+it('shows a dismissible welcome once per browser session', () => {
+  sessionStorage.removeItem('tapestry-welcome/v1')
+  render(<App />)
+  expect(screen.getByRole('img', { name: 'A tulip made of crochet stitches' })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Open my charts' }))
+  expect(screen.getByRole('button', { name: 'New photo chart' })).toBeVisible()
+  expect(sessionStorage.getItem('tapestry-welcome/v1')).toBe('seen')
+})
+
+it('can start a photo chart directly from the welcome screen', () => {
+  sessionStorage.removeItem('tapestry-welcome/v1')
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Start with a photo' }))
+  expect(screen.getByText('Photo editor route')).toBeVisible()
+})
 
 it('opens on the Home tab', () => {
   render(<App />)

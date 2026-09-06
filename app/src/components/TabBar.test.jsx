@@ -21,5 +21,7 @@ describe('TabBar', () => {
     render(<TabBar active="list" onSelect={vi.fn()} />)
 
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Home' }).querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByRole('button', { name: 'Charts' }).querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   })
 })

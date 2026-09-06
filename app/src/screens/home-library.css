@@ -1,0 +1,68 @@
+.library-screen { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink,#302742); }
+.library-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior-y:contain; padding:max(28px,env(safe-area-inset-top)) 24px 28px; scrollbar-width:none; }
+.library-scroll::-webkit-scrollbar,.other-projects-rail::-webkit-scrollbar { display:none; }
+.library-heading { margin-bottom:28px; }
+.library-heading h1 { font-family:"Avenir Next",Avenir,sans-serif; font-size:36px; line-height:1.15; font-weight:650; letter-spacing:-1.4px; margin:0 0 8px; }
+.library-heading p { font-size:14px; line-height:1.5; color:var(--body,#655B70); margin:0; }
+.library-screen h2 { font-family:"Avenir Next",Avenir,sans-serif; font-size:18px; line-height:1.4; font-weight:600; letter-spacing:-.35px; margin:0; }
+.home-continue>h2 { margin-bottom:14px; }
+.library-screen button { font-family:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.library-screen button:focus-visible,.library-screen summary:focus-visible,.tapestry-tab-bar button:focus-visible { outline:3px solid var(--accent,#724C80); outline-offset:3px; }
+.continue-project { display:block; width:100%; padding:0; text-align:left; border:0; border-radius:24px; overflow:hidden; background:var(--surface,#fff); color:var(--ink,#302742); }
+.continue-preview { display:flex; justify-content:center; align-items:center; padding:22px; min-height:236px; background:var(--canvas,#E9E5EE); }
+.continue-preview>div { transform:rotate(-3deg); box-shadow:0 6px 14px #3027421a; }
+.continue-description { display:flex; flex-direction:column; gap:8px; padding:20px; }
+.continue-project-name { font-family:"Avenir Next",Avenir,sans-serif; font-size:23px; font-weight:600; line-height:1.25; letter-spacing:-.5px; overflow-wrap:anywhere; }
+.project-row { display:block; font-size:13px; line-height:1.5; color:var(--body,#655B70); }
+.project-progress { display:block; width:100%; height:5px; overflow:hidden; border-radius:9px; background:var(--sunken,#E9E3F0); margin:5px 0; }
+.project-progress>span { display:block; height:100%; background:var(--accent,#724C80); border-radius:inherit; }
+.continue-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; color:var(--body,#655B70); font-size:12px; line-height:1.5; }
+.continue-link { display:inline-flex; gap:4px; align-items:center; color:var(--accent,#724C80); font-size:13px; font-weight:600; }
+.continue-link svg { width:16px; height:16px; }
+.other-projects { margin-top:24px; }
+.library-section-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; }
+.library-section-heading button { min-height:44px; padding:0 2px 0 14px; color:var(--accent,#724C80); font-size:14px; background:none; border:0; }
+.other-projects-rail { display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x proximity; scrollbar-width:none; padding:3px 0 8px; }
+.other-project { flex:0 0 132px; display:flex; flex-direction:column; gap:6px; padding:0; border:0; text-align:left; color:var(--body,#655B70); background:none; font-size:12px; line-height:1.4; scroll-snap-align:start; }
+.other-project-preview { padding:14px; border-radius:18px; background:var(--sunken,#E9E3F0); margin-bottom:3px; }
+.other-project-name { display:block; color:var(--ink,#302742); font-size:14px; font-weight:600; overflow-wrap:anywhere; }
+.library-bottom-action { flex-shrink:0; padding:12px 24px 10px; background:var(--paper,#F3F0FA); }
+.library-new-photo { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; min-height:56px; padding:14px 18px; border:0; border-radius:18px; background:var(--accent,#724C80); color:#fff; font-size:16px; line-height:1.35; font-weight:600; }
+.library-new-photo svg { width:23px; height:23px; flex-shrink:0; }
+.library-screen .library-photo-link { display:block; width:100%; min-height:44px; margin-top:3px; border:0; padding:8px; color:var(--body,#655B70); font-size:13px; background:none; text-transform:none; letter-spacing:normal; }
+.library-empty { display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:28px 12px; min-height:290px; }
+.library-empty p { max-width:28ch; color:var(--body,#655B70); font-size:15px; line-height:1.65; margin:12px 0 0; }
+.empty-stitches { width:108px; height:108px; margin-bottom:24px; }
+.library-empty--charts { min-height:240px; }
+.library-advanced { margin:-10px 0 20px; border-bottom:1px solid var(--border,#DDD4E5); }
+.library-advanced>summary { display:flex; align-items:center; gap:10px; min-height:52px; padding:0 0 10px; font-size:14px; color:var(--body,#655B70); cursor:pointer; list-style:none; }
+.library-advanced>summary::-webkit-details-marker { display:none; }
+.library-advanced>summary svg { width:20px; height:20px; flex-shrink:0; }
+.library-advanced .disclosure-chevron { margin-left:auto; }
+.library-advanced[open] .disclosure-chevron { transform:rotate(180deg); }
+.library-advanced-actions { display:flex; flex-direction:column; gap:8px; padding:0 0 18px; }
+.library-advanced-actions button { text-align:left; min-height:44px; border:1px solid var(--border,#DDD4E5); padding:10px 14px; border-radius:12px; color:var(--ink,#302742); background:var(--surface,#fff); font-size:14px; }
+.library-advanced-actions p,.library-notice { font-size:13px; line-height:1.6; color:var(--body,#655B70); margin:4px 0; }
+.library-notice { margin-bottom:18px; padding:12px; border-radius:12px; background:var(--sunken,#E9E3F0); }
+.library-project-list { display:flex; flex-direction:column; gap:16px; }
+.library-project { padding:16px 16px 0; border-radius:20px; background:var(--surface,#fff); }
+.library-project-open { display:flex; align-items:center; gap:14px; width:100%; padding:0 0 12px; border:0; background:none; text-align:left; color:var(--ink,#302742); }
+.library-project-info { display:flex; flex-direction:column; flex:1; min-width:0; gap:3px; }
+.library-project-name { font-family:"Avenir Next",Avenir,sans-serif; font-size:17px; line-height:1.3; font-weight:600; overflow-wrap:anywhere; }
+.library-project-completion { font-size:12px; color:var(--body,#655B70); }
+.library-open-chevron { width:16px; height:16px; flex-shrink:0; color:var(--accent,#724C80); }
+.library-project .project-tools { border:0; border-top:1px solid var(--border,#DDD4E5); border-radius:0; padding:0; background:transparent; }
+.library-project .project-tools summary { display:list-item; min-height:44px; padding:12px 0; color:var(--body,#655B70); font-size:12px; line-height:20px; }
+.library-project .project-tools[open] { padding-bottom:16px; }
+.library-project .project-tools form { align-items:stretch; }
+.library-project .project-tools label { width:100%; font-size:13px; }
+.library-project .project-tools input { width:100%; min-height:44px; font-size:16px; }
+.library-project .project-tools button { min-height:44px; font-size:13px; }
+.app-tab-bar.tapestry-tab-bar { padding:6px max(24px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left)); background:var(--paper,#F3F0FA); border-top:1px solid var(--border,#DDD4E5); gap:16px; }
+.app-tab-bar.tapestry-tab-bar button { min-height:54px; padding:0 8px; gap:2px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:12px; letter-spacing:normal; color:var(--body,#655B70); border:0; background:transparent; cursor:pointer; }
+.tapestry-tab-icon { display:flex; justify-content:center; align-items:center; width:54px; height:30px; border-radius:12px; }
+.tapestry-tab-icon svg { width:23px; height:23px; }
+.app-tab-bar.tapestry-tab-bar button[aria-current='page'] { color:var(--accent,#724C80); }
+.tapestry-tab-bar button[aria-current='page'] .tapestry-tab-icon { background:var(--sunken,#E9E3F0); }
+@media(min-width:600px) { .library-scroll { padding-left:max(32px,calc((100% - 520px)/2)); padding-right:max(32px,calc((100% - 520px)/2)); } .library-bottom-action { padding-left:max(32px,calc((100% - 520px)/2)); padding-right:max(32px,calc((100% - 520px)/2)); } }
+@media(max-width:350px) { .library-scroll { padding-left:16px; padding-right:16px; } .library-bottom-action { padding-left:16px; padding-right:16px; } .library-project { padding-left:12px; padding-right:12px; } .library-project-open { gap:10px; } }

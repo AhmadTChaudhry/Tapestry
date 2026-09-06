@@ -5,7 +5,7 @@ import YarnStage from './YarnStage'
 import { quantizeToGrid } from '../../lib/quantize'
 import { createDraftImage } from '../model'
 
-vi.mock('../../lib/quantize', () => ({ quantizeToGrid: vi.fn() }))
+vi.mock('../../lib/quantize', async importOriginal => ({ ...await importOriginal(), quantizeToGrid: vi.fn() }))
 
 const draft = (overrides = {}) => ({
   fitMode: 'crop',
@@ -26,7 +26,7 @@ describe('YarnStage', () => {
 
     expect(quantizeToGrid).toHaveBeenCalledWith({ src: 'blob:preview' }, 24, 4, expect.objectContaining({ rows: 29 }))
     expect(screen.getAllByRole('textbox')).toHaveLength(4)
-    expect(screen.getByDisplayValue('Background')).toBeVisible()
+    expect(screen.getByDisplayValue('A')).toBeVisible()
     expect(screen.getByLabelText('Colour for yarn B')).toHaveValue('#b4553c')
   })
 
@@ -36,7 +36,7 @@ describe('YarnStage', () => {
 
     fireEvent.change(screen.getByLabelText('Name for yarn B'), { target: { value: 'Rust aran' } })
 
-    expect(dispatch).toHaveBeenCalledWith({ type: 'yarn/patch', index: 1, patch: { label: 'Rust aran' } })
+    expect(dispatch).toHaveBeenCalledWith({ type: 'yarn/patch', index: 1, patch: { label: 'Rust aran', sourceHex: '#B4553C' } })
   })
 
   it('overrides a swatch and offers the photo colour back', async () => {
@@ -48,7 +48,7 @@ describe('YarnStage', () => {
     expect(screen.getByLabelText('Colour for yarn B')).toHaveValue('#123456')
     await user.click(screen.getByRole('button', { name: 'Use the photo colour for yarn B' }))
 
-    expect(dispatch).toHaveBeenCalledWith({ type: 'yarn/patch', index: 1, patch: { hex: null } })
+    expect(dispatch).toHaveBeenCalledWith({ type: 'yarn/patch', index: 1, patch: { hex: null, sourceHex: '#B4553C' } })
   })
 
   it('stays usable when the photo cannot be sampled yet', () => {

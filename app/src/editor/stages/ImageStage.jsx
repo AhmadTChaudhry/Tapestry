@@ -22,6 +22,8 @@ export default function ImageStage({ draft, dispatch }) {
 
   return (
     <div className="editor-controls">
+      <label className="editor-control">Image type<select aria-label="Image type" value={image.sampling || 'photo'} onChange={e => dispatch({ type: 'image/patch', patch: { sampling: e.target.value, ...(e.target.value === 'pixel' ? { brightness: 1, contrast: 1, saturation: 1 } : {}) } })}><option value="photo">Photo — smooth sampling</option><option value="pixel">Pixel art — preserve sampled colours</option></select></label>
+      {image.sampling === 'pixel' && <p className="editor-note">Keeps crisp edges and up to 64 sampled colours. For one pixel per stitch, set the grid to the artwork’s pixel dimensions and use square proportions. Larger or compressed artwork may need Photo mode.</p>}
       {SLIDERS.map(({ field, label }) => (
         <label className="editor-control" key={field}>
           <span className="editor-field-label">{label}</span>
@@ -51,6 +53,7 @@ export default function ImageStage({ draft, dispatch }) {
               <input
                 type="radio"
                 name="colorCount"
+                disabled={image.sampling === 'pixel'}
                 checked={image.colorCount === count}
                 onChange={() => dispatch({ type: 'image/patch', patch: { colorCount: count } })}
               />
@@ -59,6 +62,7 @@ export default function ImageStage({ draft, dispatch }) {
           ))}
         </div>
       </fieldset>
+      <label className="editor-control">Merge similar shades<select aria-label="Merge similar shades" value={image.mergeThreshold || 0} onChange={e => dispatch({ type: 'image/patch', patch: { mergeThreshold: Number(e.target.value) } })}><option value={0}>Keep distinct shades</option><option value={0.045}>Gentle</option><option value={0.09}>Stronger simplification</option></select></label>
 
       <div className="editor-actions">
         <button

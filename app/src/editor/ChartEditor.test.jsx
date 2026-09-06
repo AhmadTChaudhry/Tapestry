@@ -6,6 +6,14 @@ import { createDraft } from './model'
 import { saveDraft } from './draftRepository'
 
 vi.mock('./draftRepository', () => ({ saveDraft: vi.fn(() => Promise.resolve()) }))
+// Canvas conversion is tested with pixel fixtures separately; these tests
+// exercise editor navigation and persistence races in jsdom.
+vi.mock('../lib/conversion', () => ({
+  buildDraftChart: vi.fn(() => ({ grid: [[0]], colors: ['#000000'] })),
+  chartComplexity: () => ({ changes: 0, singles: 1 }),
+  drawChart: vi.fn(),
+  matchedYarns: () => [],
+}))
 
 afterEach(() => vi.clearAllMocks())
 
@@ -83,7 +91,7 @@ describe('ChartEditor', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Yarn' }))
 
-    expect(screen.getByRole('img', { name: 'Source preview' })).toBeVisible()
+    expect(screen.getByRole('img', { name: 'Exact stitch preview' })).toBeVisible()
     expect(screen.getByRole('tabpanel', { name: 'Yarn' })).toHaveTextContent(/palette/i)
   })
 

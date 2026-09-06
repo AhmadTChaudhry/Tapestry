@@ -1,3 +1,5 @@
+import { stitchAspect } from '../lib/gauge'
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
 const boundedNumber = (value, min, max, fallback) => {
   const number = Number(value)
@@ -13,8 +15,7 @@ export function sourceRectForDraft(draft) {
   const { width, height } = draft.source
   if (draft.fitMode === 'stretch') return { sx: 0, sy: 0, sw: width, sh: height }
 
-  const stitchAspect = draft.grid.gauge === 'square' ? 1 : 11 / 9
-  const outputAspect = (draft.grid.columns / draft.grid.rows) * stitchAspect
+  const outputAspect = (draft.grid.columns / draft.grid.rows) / stitchAspect(draft.grid)
   const rotation = normalizedQuarterRotation(draft.transform.rotation)
   const cropAspect = rotation % 180 === 0 ? outputAspect : 1 / outputAspect
   const sourceAspect = width / height

@@ -1,167 +1,64 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useStore } from '../store'
 import { percentDone } from '../lib/chart'
 import MiniChart from '../components/MiniChart'
+import ProjectTools from '../components/ProjectTools'
+import { downloadFile, serializeBackup, MAX_BACKUP_BYTES } from '../lib/backup'
+import { PhotoIcon } from './Home'
+import './home-library.css'
 
 export default function MyCharts({ onOpen, onNew, onImportFile }) {
-  const { projects } = useStore()
+  const { projects: library, importProjects } = useStore()
+  const [archived, setArchived] = useState(false)
+  const [notice, setNotice] = useState('')
+  const backupRef = useRef(null)
   const fileRef = useRef(null)
-
-  return (
-    <div className="screen screen--tab">
-      <div
-        className="pad no-bar"
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          paddingTop: 'max(66px, calc(env(safe-area-inset-top) + 22px))',
-          paddingBottom: 24,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 22,
-        }}
-      >
-        <header
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'baseline',
-          }}
-        >
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 32,
-              fontWeight: 600,
-              letterSpacing: '-0.02em',
-              color: 'var(--ink)',
-            }}
-          >
-            Charts
-          </h1>
-          <span className="mono" style={{ fontSize: 12, color: 'var(--faint)' }}>
-            {projects.length} ACTIVE
-          </span>
-        </header>
-
-        {projects.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {projects.map((p) => (
-              <ProjectCard key={p.id} project={p} onClick={() => onOpen(p.id)} />
-            ))}
-          </div>
-        )}
-
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <button className="pill-primary press" onClick={onNew}>
-            + New chart from a photo
+  const projects = library.filter(p => Boolean(p.archived) === archived)
+  return <main className="screen screen--tab library-screen">
+    <div className="library-scroll">
+      <header className="library-heading"><h1>Your charts</h1><p>{projects.length} {archived ? 'archived' : 'active'} {projects.length === 1 ? 'project' : 'projects'}</p></header>
+      <details className="library-advanced">
+        <summary><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M4 7h16M4 17h16" strokeLinecap="round" /><circle cx="9" cy="7" r="3" fill="var(--paper)" /><circle cx="15" cy="17" r="3" fill="var(--paper)" /></svg><span>Library tools</span><svg className="disclosure-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="m8 10 4 4 4-4" strokeLinecap="round" strokeLinejoin="round" /></svg></summary>
+        <div className="library-advanced-actions">
+          <button type="button" aria-pressed={archived} onClick={() => setArchived(value => !value)}>{archived ? 'Show active charts' : 'Show archived charts'}</button>
+          <button type="button" onClick={() => {
+            try { downloadFile('crochet-library.json', serializeBackup(library)); setNotice('Backup downloaded.') }
+            catch (error) { setNotice(error.message) }
+          }}>Back up whole library</button>
+          <button type="button" onClick={() => backupRef.current?.click()}>Import JSON backup</button>
+          <p>Backups include all your charts and row progress. Photo-editor drafts stay on this device.</p>
+        </div>
+      </details>
+      {notice && <p className="library-notice" role="status">{notice}</p>}
+      {projects.length ? <div className="library-project-list">
+        {projects.map(project => <article className="library-project" key={project.id}>
+          <button className="library-project-open" type="button" onClick={() => onOpen(project.id)}>
+            <MiniChart project={project} size={80} />
+            <span className="library-project-info"><span className="library-project-name">{project.name}</span><span className="project-row">Row {project.currentRow} of {project.totalRows}</span><span className="project-progress" aria-hidden="true"><span style={{ width: `${percentDone(project)}%` }} /></span><span className="library-project-completion">{percentDone(project)}% complete</span></span>
+            <svg className="library-open-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="m9 5 7 7-7 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button
-            className="chart-photo-chooser mono press"
-            onClick={() => fileRef.current?.click()}
-            style={{
-              fontSize: 11,
-              color: 'var(--faint-2)',
-              textAlign: 'center',
-              letterSpacing: '0.04em',
-            }}
-          >
-            OR CHOOSE AN EXISTING PHOTO
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              e.target.value = ''
-              if (f) onImportFile(f)
-            }}
-          />
-        </div>
-      </div>
+          <ProjectTools project={project} onOpen={onOpen} />
+        </article>)}
+      </div> : <div className="library-empty library-empty--charts"><h2>{archived ? 'No archived charts' : 'A little room for inspiration'}</h2><p>{archived ? 'Charts you archive will be kept here, ready to restore whenever you like.' : 'Start with a photo, or bring your charts back with a library backup.'}</p></div>}
     </div>
-  )
-}
-
-function ProjectCard({ project, onClick }) {
-  const pct = percentDone(project)
-  return (
-    <button
-      className="press"
-      onClick={onClick}
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 14,
-        padding: 14,
-        display: 'flex',
-        gap: 14,
-        alignItems: 'center',
-        textAlign: 'left',
-        width: '100%',
-        boxShadow: 'var(--shadow-card)',
-      }}
-    >
-      <MiniChart project={project} />
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div
-          style={{
-            fontSize: 17,
-            fontWeight: 600,
-            color: 'var(--ink)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {project.name}
-        </div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--faint)' }}>
-          ROW {project.currentRow} / {project.totalRows} · {pct}%
-        </div>
-        <div
-          style={{
-            height: 4,
-            borderRadius: 999,
-            background: 'var(--sunken)',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              height: '100%',
-              width: `${pct}%`,
-              background: 'var(--accent)',
-              borderRadius: 999,
-            }}
-          />
-        </div>
-      </div>
-    </button>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div
-      style={{
-        border: '1px dashed var(--border-strong)',
-        borderRadius: 14,
-        padding: '32px 20px',
-        textAlign: 'center',
-        color: 'var(--body)',
-      }}
-    >
-      <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--ink)', marginBottom: 6 }}>
-        No charts yet
-      </div>
-      <div style={{ fontSize: 14, lineHeight: 1.45 }}>
-        Start with a photo — a bold, high-contrast one turns into the clearest chart.
-      </div>
+    <div className="library-bottom-action">
+      <button className="library-new-photo" type="button" onClick={onNew}><PhotoIcon />New chart from a photo</button>
+      <button className="chart-photo-chooser library-photo-link" type="button" onClick={() => fileRef.current?.click()}>Choose an existing photo</button>
     </div>
-  )
+    <input ref={fileRef} type="file" accept="image/*" aria-label="Choose a photo" hidden onChange={event => {
+      const file = event.target.files?.[0]
+      event.target.value = ''
+      if (file) onImportFile(file)
+    }} />
+    <input ref={backupRef} type="file" accept=".json,application/json" aria-label="Import chart backup" hidden onChange={async event => {
+      const file = event.target.files?.[0]
+      event.target.value = ''
+      if (!file) return
+      try {
+        if (file.size > MAX_BACKUP_BYTES) throw new Error('Backup exceeds 20 MB.')
+        const imported = importProjects(await file.text())
+        setNotice(`Imported ${imported.length} charts as separate copies. Photo-editor drafts are not included. Source and version metadata are retained.`)
+      } catch (error) { setNotice(`Import failed: ${error.message}`) }
+    }} />
+  </main>
 }

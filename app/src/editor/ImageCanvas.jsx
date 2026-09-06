@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef } from 'react'
-import { drawStitchPreview } from './geometry'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { drawStitchPreview, drawDraftToCanvas } from './geometry'
+import { buildDraftChart, drawChart } from '../lib/conversion'
+import { stitchAspect } from '../lib/gauge'
 
 const clampOffset = (value) => Math.max(-1, Math.min(1, value))
 
@@ -12,22 +14,23 @@ const previewFilter = (image) => {
 }
 
 const frameForGrid = (grid) => {
-  const cellWidth = grid.gauge === 'square' ? 1 : 11
-  const cellHeight = grid.gauge === 'square' ? 1 : 9
+  const cellWidth = grid.gauge === 'square' && !grid.swatch ? 1 : 11
+  const cellHeight = cellWidth * stitchAspect(grid)
   const width = grid.columns * cellWidth
   const height = grid.rows * cellHeight
 
   return { width, height, aspect: width / height }
 }
 
-export default function ImageCanvas({ image, draft, dispatch }) {
+export default function ImageCanvas({ image, draft, dispatch, mode = 'source', showGrid = true, highlight = null, zoom = 1 }) {
+  const [error, setError] = useState(null)
   const canvasRef = useRef(null)
   const sourceRef = useRef(null)
   const bufferRef = useRef(null)
   const drag = useRef(null)
   const { transform, grid } = draft
   const cropEnabled = draft.fitMode === 'crop'
-  const frame = frameForGrid(grid)
+  const frame = frameForGrid(mode === 'chart' ? { ...grid, gauge: 'square', swatch: null } : grid)
   const draw = useCallback(() => {
     const canvas = canvasRef.current
     const source = sourceRef.current
@@ -35,8 +38,15 @@ export default function ImageCanvas({ image, draft, dispatch }) {
     if (!context || !source) return
 
     if (!bufferRef.current) bufferRef.current = document.createElement('canvas')
-    drawStitchPreview(context, source, draft, bufferRef.current)
-  }, [draft])
+    try {
+      if (mode === 'original') drawDraftToCanvas(context, source, draft)
+      else if (mode === 'source') drawStitchPreview(context, source, draft, bufferRef.current)
+      else drawChart(context, buildDraftChart(source, draft), { highlight })
+      setError(null)
+    } catch (reason) {
+      setError(reason.message || 'Preview unavailable. Try fewer colours or Photo mode.')
+    }
+  }, [draft, mode, highlight])
 
   useEffect(() => {
     if (sourceRef.current?.complete && sourceRef.current.naturalWidth > 0) draw()
@@ -95,18 +105,20 @@ export default function ImageCanvas({ image, draft, dispatch }) {
         '--frame-aspect': frame.aspect,
         '--grid-x': `${100 / grid.columns}%`,
         '--grid-y': `${100 / grid.rows}%`,
+        ...(zoom > 1 ? { width: `${zoom * 100}%`, maxWidth: 'none', maxHeight: 'none' } : {}),
       }}
     >
       <canvas
         ref={canvasRef}
         role="img"
-        aria-label="Source preview"
-        width={frame.width}
-        height={frame.height}
-        style={{ filter: previewFilter(draft.image) }}
+        aria-label={mode === 'source' || mode === 'original' ? 'Source preview' : 'Exact stitch preview'}
+        width={mode === 'original' ? frame.width * 3 : frame.width}
+        height={mode === 'original' ? frame.height * 3 : frame.height}
+        style={{ filter: mode === 'source' ? previewFilter(draft.image) : undefined }}
       />
       <img ref={sourceRef} className="editor-canvas-source" data-testid="source-image" src={image.src} alt="" aria-hidden="true" onLoad={draw} />
-      <span className="editor-grid-overlay" aria-hidden="true" />
+      {showGrid && <span className="editor-grid-overlay" aria-hidden="true" />}
+      {error && <p className="preview-error" role="alert">{error}</p>}
     </div>
   )
 }

@@ -19,13 +19,30 @@ const store = vi.hoisted(() => ({ projects: [] }))
 vi.mock('../store', () => ({ useStore: () => store }))
 
 describe('Home', () => {
+  it('keeps archived charts out of Continue and uses completed rows for progress', () => {
+    store.projects = [project({ id: 'archive', name: 'Archived flowers', archived: true }), project({ completedRows: [1], currentRow: 3 })]
+    render(<Home onOpen={vi.fn()} onNew={vi.fn()} onImportFile={vi.fn()} onSeeAll={vi.fn()} />)
+    expect(screen.queryByText('Archived flowers')).not.toBeInTheDocument()
+    expect(screen.getByText('Row 3 of 4')).toBeVisible()
+    expect(screen.getByText('25% complete')).toBeVisible()
+  })
+
+  it('passes the chosen photo to the import callback', async () => {
+    store.projects = []
+    const user = userEvent.setup()
+    const onImportFile = vi.fn()
+    render(<Home onOpen={vi.fn()} onNew={vi.fn()} onImportFile={onImportFile} onSeeAll={vi.fn()} />)
+    const file = new File(['photo'], 'flowers.png', { type: 'image/png' })
+    await user.upload(screen.getByLabelText('Choose a photo'), file)
+    expect(onImportFile).toHaveBeenCalledWith(file)
+  })
   it('shows an empty state and the import affordances when nothing is in progress', () => {
     store.projects = []
     render(<Home onOpen={vi.fn()} onNew={vi.fn()} onImportFile={vi.fn()} onSeeAll={vi.fn()} />)
 
     expect(screen.getByText('Nothing in progress yet')).toBeVisible()
-    expect(screen.getByText('NO CHARTS YET')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'OR CHOOSE AN EXISTING PHOTO' })).toBeVisible()
+    expect(screen.getByText('Your next project starts here')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Choose an existing photo' })).toBeVisible()
   })
 
   it('offers to continue the most recent chart and opens it on click', async () => {
@@ -35,7 +52,7 @@ describe('Home', () => {
 
     render(<Home onOpen={onOpen} onNew={vi.fn()} onImportFile={vi.fn()} onSeeAll={vi.fn()} />)
 
-    expect(screen.getByText('1 IN PROGRESS')).toBeVisible()
+    expect(screen.getByText('1 project in your library')).toBeVisible()
     await user.click(screen.getByRole('button', { name: /Fox & Ferns/ }))
 
     expect(onOpen).toHaveBeenCalledWith('p-1')
@@ -73,8 +90,8 @@ describe('Home', () => {
 
     render(<Home onOpen={vi.fn()} onNew={onNew} onImportFile={vi.fn()} onSeeAll={onSeeAll} />)
 
-    await user.click(screen.getByRole('button', { name: '+ New chart from a photo' }))
-    await user.click(screen.getByRole('button', { name: 'SEE ALL' }))
+    await user.click(screen.getByRole('button', { name: 'New chart from a photo' }))
+    await user.click(screen.getByRole('button', { name: 'See all' }))
 
     expect(onNew).toHaveBeenCalledOnce()
     expect(onSeeAll).toHaveBeenCalledOnce()
