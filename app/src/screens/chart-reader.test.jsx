@@ -41,6 +41,12 @@ describe('chart reader interactions', () => {
     expect(Number(cell.getAttribute('width'))).toBeGreaterThanOrEqual(43)
     expect(Number(cell.getAttribute('height'))).toBeGreaterThanOrEqual(43)
   })
+  it('dims completed rows while keeping the current and upcoming rows full strength', () => {
+    render(<Harness project={{ ...base, currentRow: 2, completedRows: [1] }} />)
+
+    expect(screen.getByTestId('chart-row-1')).toHaveAttribute('opacity', '0.3')
+    expect(screen.getByTestId('chart-row-2')).not.toHaveAttribute('opacity')
+  })
   it('keeps the edit draft recoverable if saving a version fails', () => {
     render(<Harness project={{ ...base, currentRow: 2 }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Edit cells' }))

@@ -205,6 +205,7 @@ function ChartViewport({ project, grid, zoom, overview, symbols, square, gaps, e
   const width = project.stitchesWide * pitch
   const height = grid.length * rowHeight
   const current = clampRow(project, project.currentRow)
+  const completedRows = new Set(completedRowNumbers(project))
   useLayoutEffect(() => {
     const el = ref.current
     const measure = () => setSize({ width: el.clientWidth || 375, height: el.clientHeight || 400 })
@@ -222,7 +223,7 @@ function ChartViewport({ project, grid, zoom, overview, symbols, square, gaps, e
   }, [target, overview])
   return <div ref={ref} className="cr-viewport" tabIndex={0} role="region" aria-label="Full chart, scroll to browse">
     <svg width={width + 64} height={height + 16} role="img" aria-label={`Full chart: ${project.stitchesWide} columns, ${grid.length} rows. Row 1 at bottom; column 1 at left. ${editing ? 'Tap a cell to select it, then apply your edit using the controls.' : 'Reading direction changes instructions only.'}`}>
-      <ChartCells grid={grid} colors={project.colors} pitch={pitch} rowHeight={rowHeight} gaps={gaps} symbols={symbols && !overview} />
+      <ChartCells grid={grid} colors={project.colors} pitch={pitch} rowHeight={rowHeight} gaps={gaps} symbols={symbols && !overview} completedRows={completedRows} />
       {grid.map((_, r) => (r + 1 === current || (r + 1) % Math.max(1, Math.ceil(15 / rowHeight)) === 0) && <text key={r} x="27" y={(grid.length - r - 0.5) * rowHeight + 8} textAnchor="end" dominantBaseline="central" className="cr-row-number" fontSize="10">{r + 1}</text>)}
       <rect x="32" y={(grid.length - current) * rowHeight + 8} width={width} height={rowHeight} fill="none" stroke="var(--accent-readout)" strokeWidth="2" pointerEvents="none" />
       {editing && <rect x={32 + (selected.column - 1) * pitch} y={(grid.length - selected.row) * rowHeight + 8} width={pitch} height={rowHeight} fill="none" stroke="var(--ink)" strokeDasharray="4 2" strokeWidth="3" pointerEvents="none" />}
@@ -236,9 +237,9 @@ function ChartViewport({ project, grid, zoom, overview, symbols, square, gaps, e
   </div>
 }
 
-const ChartCells = memo(function ChartCells({ grid, colors, pitch, rowHeight, gaps, symbols }) {
+const ChartCells = memo(function ChartCells({ grid, colors, pitch, rowHeight, gaps, symbols, completedRows }) {
   const gap = gaps ? Math.min(1, pitch * 0.08, rowHeight * 0.08) : 0
-  return grid.map((row, r) => <g key={r} data-testid={`chart-row-${r + 1}`} transform={`translate(32, ${(grid.length - 1 - r) * rowHeight + 8})`}>
+  return grid.map((row, r) => <g key={r} data-testid={`chart-row-${r + 1}`} opacity={completedRows.has(r + 1) ? 0.3 : undefined} transform={`translate(32, ${(grid.length - 1 - r) * rowHeight + 8})`}>
     {row.map((color, c) => <g key={c}>
       <rect x={c * pitch} y="0" width={pitch - gap} height={rowHeight - gap} fill={colors[color] || 'transparent'} />
       {symbols && <text x={(c + 0.5) * pitch} y={rowHeight / 2} textAnchor="middle" dominantBaseline="central" fontSize={Math.min(16, pitch * 0.65, rowHeight * 0.65)} fill="#111" stroke="#fff" strokeWidth="2" paintOrder="stroke">{rankLabel(color)}</text>}
