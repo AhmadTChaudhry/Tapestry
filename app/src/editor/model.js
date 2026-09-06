@@ -1,5 +1,13 @@
 export const EDITOR_SCHEMA_VERSION = 1
 export const EDITOR_STAGES = ['frame', 'grid', 'image', 'yarn', 'review']
+export const COLOR_COUNTS = [2, 3, 4, 6]
+// Neutral is 1 on every axis, so an untouched draft samples the photo as-is.
+export const IMAGE_LIMITS = {
+  brightness: [0.6, 1.4],
+  contrast: [0.6, 1.6],
+  saturation: [0, 1.8],
+}
+export const HEX_PATTERN = /^#[0-9a-f]{6}$/i
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, Number(n)))
 const normalizeRotation = (degrees) => (
@@ -21,6 +29,42 @@ const rowsForColumns = (draft, columns, gauge = draft.grid?.gauge || 'true') => 
   const gaugeCorrection = gauge === 'square' ? 1 : 11 / 9
   return clamp(Math.round(columns * (draft.source.height / draft.source.width) * gaugeCorrection), 8, 400)
 }
+export const createDraftImage = () => ({
+  brightness: 1,
+  contrast: 1,
+  saturation: 1,
+  colorCount: 4,
+})
+
+const normalizeImage = (image) => {
+  const next = { ...image }
+  Object.entries(IMAGE_LIMITS).forEach(([field, [min, max]]) => {
+    next[field] = clamp(next[field], min, max)
+  })
+  next.colorCount = COLOR_COUNTS.includes(Number(next.colorCount))
+    ? Number(next.colorCount)
+    : createDraftImage().colorCount
+  return next
+}
+
+const isYarnOverride = (value) => (
+  value === null
+  || value === undefined
+  || (
+    typeof value === 'object'
+    && (value.label === undefined || typeof value.label === 'string')
+    && (value.hex === undefined || value.hex === null || (typeof value.hex === 'string' && HEX_PATTERN.test(value.hex)))
+  )
+)
+
+/** Fills in fields added after a draft was first written, so older saved
+ *  drafts still open instead of failing validation. */
+export const hydrateDraft = (draft) => ({
+  ...draft,
+  image: normalizeImage({ ...createDraftImage(), ...draft?.image }),
+  yarns: Array.isArray(draft?.yarns) ? draft.yarns : [],
+})
+
 const normalizeTransform = (transform) => ({
   ...transform,
   offsetX: clamp(transform.offsetX, -1, 1),
@@ -41,6 +85,8 @@ export function createDraft(asset, name = 'New chart') {
     fitMode: 'crop',
     transform: { offsetX: 0, offsetY: 0, scale: 1, rotation: 0, flipX: false, flipY: false },
     grid: { columns: 24, rows, dimensionsLocked: true, gauge: 'true', workingMethod: 'round' },
+    image: createDraftImage(),
+    yarns: [],
     activeStage: 'frame',
     createdAt: now,
     updatedAt: now,
@@ -91,6 +137,38 @@ export function editorReducer(draft, action) {
         }
         return touch(draft, { grid })
       }
+    case 'image/patch':
+      {
+        const patch = action.patch || {}
+        if (hasInvalidNumericPatch(patch, ['brightness', 'contrast', 'saturation', 'colorCount'])) return draft
+        if (patch.colorCount !== undefined && !COLOR_COUNTS.includes(Number(patch.colorCount))) return draft
+
+        const image = normalizeImage({ ...createDraftImage(), ...draft.image, ...patch })
+        // Overrides are held per colour rank, so shrinking the palette drops
+        // the ranks that no longer exist rather than leaving them dangling.
+        const yarns = (draft.yarns || []).slice(0, image.colorCount)
+        return touch(draft, { image, yarns })
+      }
+    case 'image/reset':
+      return touch(draft, {
+        image: { ...createDraftImage(), colorCount: draft.image?.colorCount ?? createDraftImage().colorCount },
+      })
+    case 'yarn/patch':
+      {
+        const index = Number(action.index)
+        const colorCount = draft.image?.colorCount ?? createDraftImage().colorCount
+        if (!Number.isInteger(index) || index < 0 || index >= colorCount) return draft
+        if (!isYarnOverride(action.patch)) return draft
+
+        const yarns = Array.from({ length: colorCount }, (_, i) => (draft.yarns || [])[i] ?? null)
+        const merged = { ...(yarns[index] || {}), ...action.patch }
+        if (typeof merged.label === 'string' && merged.label.trim() === '') delete merged.label
+        if (merged.hex === null) delete merged.hex
+        yarns[index] = Object.keys(merged).length > 0 ? merged : null
+        return touch(draft, { yarns })
+      }
+    case 'yarn/reset':
+      return touch(draft, { yarns: [] })
     default:
       return draft
   }
@@ -135,6 +213,17 @@ export function validateDraft(value) {
     && [0, 90, 180, 270].includes(value.transform.rotation)
     && typeof value.transform.flipX === 'boolean'
     && typeof value.transform.flipY === 'boolean'
+  const imageValid = value?.image === undefined || (
+    Object.entries(IMAGE_LIMITS).every(([field, [min, max]]) => (
+      typeof value.image?.[field] === 'number'
+      && Number.isFinite(value.image[field])
+      && value.image[field] >= min
+      && value.image[field] <= max
+    ))
+    && COLOR_COUNTS.includes(value.image.colorCount)
+  )
+  const yarnsValid = value?.yarns === undefined
+    || (Array.isArray(value.yarns) && value.yarns.every(isYarnOverride))
   const valid = value?.schemaVersion === EDITOR_SCHEMA_VERSION
     && typeof value.id === 'string'
     && typeof value.name === 'string'
@@ -149,6 +238,8 @@ export function validateDraft(value) {
     && (value.grid?.gauge === 'true' || value.grid?.gauge === 'square')
     && (value.grid?.workingMethod === 'round' || value.grid?.workingMethod === 'turned')
     && transformValid
+    && imageValid
+    && yarnsValid
     && EDITOR_STAGES.includes(value.activeStage)
     && hasParseableTimestamp(value.createdAt)
     && hasParseableTimestamp(value.updatedAt)

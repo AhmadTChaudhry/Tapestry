@@ -62,10 +62,34 @@ export function drawDraftToCanvas(ctx, image, draft) {
   const { sx, sy, sw, sh } = plan.sourceRect
   const { x, y, width: drawWidth, height: drawHeight } = plan.destination
   const { width: canvasWidth, height: canvasHeight } = ctx.canvas
+  // The preview canvas is reused across redraws and its width/height attributes
+  // only change with the grid, so rotating or panning a source with transparency
+  // would otherwise composite the new frame over the last one.
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight)
   ctx.save()
   ctx.translate(canvasWidth / 2, canvasHeight / 2)
   ctx.rotate((plan.rotation * Math.PI) / 180)
   ctx.scale(plan.scale.x, plan.scale.y)
   ctx.drawImage(image, sx, sy, sw, sh, x, y, drawWidth, drawHeight)
   ctx.restore()
+}
+
+/** Renders the draft as flat, single-colour stitch blocks — a stitch is
+ *  either empty or one colour, never a gradient across the cell. Drawing
+ *  straight into the full-size preview canvas would leave the browser's own
+ *  smoothing blending each cell into its neighbours at the grid lines,
+ *  visibly "half filling" a box. Compositing at one pixel per stitch first
+ *  lets the same downscale filter quantizeToGrid relies on average each
+ *  cell down to one flat colour, then that gets blitted up with smoothing
+ *  off — the result matches exactly what the finished chart will show. */
+export function drawStitchPreview(ctx, image, draft, buffer = document.createElement('canvas')) {
+  const { columns, rows } = draft.grid
+  buffer.width = columns
+  buffer.height = rows
+  drawDraftToCanvas(buffer.getContext('2d'), image, draft)
+
+  const { width, height } = ctx.canvas
+  ctx.clearRect(0, 0, width, height)
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(buffer, 0, 0, width, height)
 }

@@ -83,6 +83,25 @@ export function StoreProvider({ children }) {
         })),
       addProject: (project) =>
         setState((s) => ({ ...s, projects: [project, ...s.projects] })),
+      // Regenerating an editor draft replaces the chart it already produced
+      // rather than stacking another copy of it on the list. Row progress is
+      // kept where the new grid still reaches it.
+      upsertProject: (project) =>
+        setState((s) => {
+          const index = s.projects.findIndex(
+            (p) =>
+              p.id === project.id ||
+              (project.editorDraftId && p.editorDraftId === project.editorDraftId),
+          )
+          if (index === -1) return { ...s, projects: [project, ...s.projects] }
+
+          const existing = s.projects[index]
+          const merged = { ...existing, ...project, id: existing.id }
+          merged.currentRow = clampRow(merged, existing.currentRow)
+          const projects = [...s.projects]
+          projects[index] = merged
+          return { ...s, projects }
+        }),
       removeProject: (id) =>
         setState((s) => ({ ...s, projects: s.projects.filter((p) => p.id !== id) })),
     }),

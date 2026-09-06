@@ -7,7 +7,7 @@ let dbPromise
 function openDatabase() {
   if (dbPromise) return dbPromise
 
-  dbPromise = new Promise((resolve, reject) => {
+  const pending = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
     request.onupgradeneeded = () => {
@@ -19,10 +19,19 @@ function openDatabase() {
       }
     }
     request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
+    request.onerror = () => reject(request.error || new Error('IndexedDB open failed'))
+    request.onblocked = () => reject(new Error('IndexedDB open blocked'))
   })
 
-  return dbPromise
+  // Never cache a failure: a blocked or transiently refused open would
+  // otherwise make every later save reject for the rest of the session.
+  const attempt = pending.catch((error) => {
+    if (dbPromise === attempt) dbPromise = null
+    throw error
+  })
+  dbPromise = attempt
+
+  return attempt
 }
 
 async function transact(storeName, mode, operation) {

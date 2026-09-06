@@ -3,11 +3,11 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ImageCanvas from './ImageCanvas'
 
-const drawDraftToCanvas = vi.hoisted(() => vi.fn())
+const drawStitchPreview = vi.hoisted(() => vi.fn())
 
 vi.mock('./geometry', async (importOriginal) => ({
   ...await importOriginal(),
-  drawDraftToCanvas,
+  drawStitchPreview,
 }))
 
 const source = { width: 1200, height: 800 }
@@ -22,7 +22,7 @@ const createDraft = (overrides = {}) => ({
 })
 
 beforeEach(() => {
-  drawDraftToCanvas.mockReset()
+  drawStitchPreview.mockReset()
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context)
 })
 
@@ -91,7 +91,7 @@ it('paints the persisted draft geometry into a canvas source preview', () => {
   fireEvent.load(screen.getByTestId('source-image'))
 
   expect(preview.tagName).toBe('CANVAS')
-  expect(drawDraftToCanvas).toHaveBeenLastCalledWith(context, screen.getByTestId('source-image'), draft)
+  expect(drawStitchPreview).toHaveBeenLastCalledWith(context, screen.getByTestId('source-image'), draft, expect.anything())
 })
 
 it.each([
@@ -121,7 +121,7 @@ it.each([90, 270])('redraws a %i degree quarter-turn through reviewed canvas geo
   fireEvent.load(screen.getByTestId('source-image'))
 
   expect(preview.style.transform).toBe('')
-  expect(drawDraftToCanvas).toHaveBeenLastCalledWith(context, screen.getByTestId('source-image'), draft)
+  expect(drawStitchPreview).toHaveBeenLastCalledWith(context, screen.getByTestId('source-image'), draft, expect.anything())
 })
 
 it('redraws when persisted scale or offset changes', () => {
@@ -133,5 +133,20 @@ it('redraws when persisted scale or offset changes', () => {
   view.rerender(<ImageCanvas image={{ src: 'blob:preview' }} draft={nextDraft} dispatch={vi.fn()} />)
   fireEvent.load(screen.getByTestId('source-image'))
 
-  expect(drawDraftToCanvas).toHaveBeenLastCalledWith(context, screen.getByTestId('source-image'), nextDraft)
+  expect(drawStitchPreview).toHaveBeenLastCalledWith(context, screen.getByTestId('source-image'), nextDraft, expect.anything())
+})
+
+it('reuses the same offscreen buffer canvas across redraws instead of allocating one per frame', () => {
+  const initialDraft = createDraft()
+  const nextDraft = createDraft({ transform: { offsetX: 0.4, offsetY: -0.3, scale: 2, rotation: 0, flipX: false, flipY: false } })
+  const view = render(<ImageCanvas image={{ src: 'blob:preview' }} draft={initialDraft} dispatch={vi.fn()} />)
+
+  fireEvent.load(screen.getByTestId('source-image'))
+  const firstBuffer = drawStitchPreview.mock.calls.at(-1)[3]
+  view.rerender(<ImageCanvas image={{ src: 'blob:preview' }} draft={nextDraft} dispatch={vi.fn()} />)
+  fireEvent.load(screen.getByTestId('source-image'))
+  const secondBuffer = drawStitchPreview.mock.calls.at(-1)[3]
+
+  expect(firstBuffer).toBeInstanceOf(HTMLCanvasElement)
+  expect(secondBuffer).toBe(firstBuffer)
 })

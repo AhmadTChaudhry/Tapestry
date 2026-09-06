@@ -102,6 +102,70 @@ button {
   position: relative;
 }
 
+/* A screen hosted inside the tab shell fills the space the tab bar leaves
+   rather than the whole viewport — the tab bar already occupies its own
+   share of the 100dvh below it. */
+.screen.screen--tab {
+  height: 100%;
+}
+
+/* Top-level shell for the two tab-bar screens (Home, Charts). Full-screen
+   routes (the photo editor, an open chart) render outside it, so they still
+   take the whole viewport and the tab bar is not visible over them — the
+   standard iOS pattern of hiding the tab bar on a pushed screen. */
+.app-shell {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.app-shell-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-tab-bar {
+  display: flex;
+  flex-shrink: 0;
+  border-top: 1px solid var(--hairline);
+  background: var(--paper);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.app-tab-bar button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 49px;
+  padding: 6px 4px 2px;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.app-tab-bar button[aria-current='page'] {
+  color: var(--accent);
+}
+
+.app-tab-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.home-eyebrow {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .pad {
   padding-left: 20px;
   padding-right: 20px;

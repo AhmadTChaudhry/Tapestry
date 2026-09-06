@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDraft } from './model'
 import * as draftRepository from './draftRepository'
 import {
@@ -226,6 +226,23 @@ describe('draft repository', () => {
     } finally {
       restores.reverse().forEach((restore) => restore())
     }
+  })
+
+  it('retries a failed open instead of caching the rejection for the session', async () => {
+    const open = indexedDB.open.bind(indexedDB)
+    const spy = vi.spyOn(indexedDB, 'open').mockImplementationOnce(() => {
+      const request = { onsuccess: null, onerror: null, onupgradeneeded: null, onblocked: null, error: new Error('refused') }
+      setTimeout(() => request.onerror?.(), 0)
+      return request
+    })
+
+    // First attempt fails...
+    await expect(getLatestDraft()).rejects.toThrow('refused')
+    spy.mockImplementation((...args) => open(...args))
+
+    // ...and the next one is allowed to succeed rather than reusing the failure.
+    await expect(getLatestDraft()).resolves.toBeNull()
+    spy.mockRestore()
   })
 
   it('rejects reset when an external IndexedDB connection blocks deletion', async () => {

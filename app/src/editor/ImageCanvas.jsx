@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { drawDraftToCanvas } from './geometry'
+import { drawStitchPreview } from './geometry'
 
 const clampOffset = (value) => Math.max(-1, Math.min(1, value))
+
+// Same operations, same order as quantize.applyImageAdjustments, so the
+// preview and the charted result agree.
+const previewFilter = (image) => {
+  const { brightness = 1, contrast = 1, saturation = 1 } = image || {}
+  if (brightness === 1 && contrast === 1 && saturation === 1) return undefined
+  return `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`
+}
 
 const frameForGrid = (grid) => {
   const cellWidth = grid.gauge === 'square' ? 1 : 11
@@ -15,6 +23,7 @@ const frameForGrid = (grid) => {
 export default function ImageCanvas({ image, draft, dispatch }) {
   const canvasRef = useRef(null)
   const sourceRef = useRef(null)
+  const bufferRef = useRef(null)
   const drag = useRef(null)
   const { transform, grid } = draft
   const cropEnabled = draft.fitMode === 'crop'
@@ -25,7 +34,8 @@ export default function ImageCanvas({ image, draft, dispatch }) {
     const context = canvas?.getContext('2d')
     if (!context || !source) return
 
-    drawDraftToCanvas(context, source, draft)
+    if (!bufferRef.current) bufferRef.current = document.createElement('canvas')
+    drawStitchPreview(context, source, draft, bufferRef.current)
   }, [draft])
 
   useEffect(() => {
@@ -87,7 +97,14 @@ export default function ImageCanvas({ image, draft, dispatch }) {
         '--grid-y': `${100 / grid.rows}%`,
       }}
     >
-      <canvas ref={canvasRef} role="img" aria-label="Source preview" width={frame.width} height={frame.height} />
+      <canvas
+        ref={canvasRef}
+        role="img"
+        aria-label="Source preview"
+        width={frame.width}
+        height={frame.height}
+        style={{ filter: previewFilter(draft.image) }}
+      />
       <img ref={sourceRef} className="editor-canvas-source" data-testid="source-image" src={image.src} alt="" aria-hidden="true" onLoad={draw} />
       <span className="editor-grid-overlay" aria-hidden="true" />
     </div>

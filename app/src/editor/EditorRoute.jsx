@@ -3,16 +3,17 @@ import { loadImageFile, quantizeToGrid, revokeImage } from '../lib/quantize'
 import { useStore } from '../store'
 import ChartEditor from './ChartEditor'
 import { getAsset, getLatestDraft, saveAsset, saveDraft } from './draftRepository'
-import { createDraft, validateDraft } from './model'
+import { createDraft, createDraftImage, hydrateDraft, validateDraft } from './model'
 import './editor.css'
 
 const restoreError = 'Your saved draft could not be restored.'
 
 export default function EditorRoute({ initialFile, onBack, onGenerated }) {
-  const { addProject } = useStore()
+  const { projects, upsertProject } = useStore()
   const [draft, setDraft] = useState(null)
   const [image, setImage] = useState(null)
   const [error, setError] = useState(null)
+  const [resumable, setResumable] = useState(null)
   const fileRef = useRef(null)
   const imageRef = useRef(null)
   const requestRef = useRef(0)
@@ -55,16 +56,30 @@ export default function EditorRoute({ initialFile, onBack, onGenerated }) {
     }
   }
 
-  const recoverLatestDraft = async () => {
+  // Only look for a draft worth offering — restoring one unasked would mean
+  // "New chart from a photo" silently reopened the last chart instead of
+  // letting the user choose a photo.
+  const probeResumableDraft = async () => {
+    try {
+      const saved = await getLatestDraft()
+      if (!mountedRef.current || !saved || !validateDraft(saved).ok) return
+
+      const asset = await getAsset(saved.assetId)
+      if (!mountedRef.current || !asset?.blob) return
+
+      setResumable(saved)
+    } catch {
+      /* nothing offerable — the import screen stands on its own */
+    }
+  }
+
+  const resumeDraft = async (saved) => {
     const request = ++requestRef.current
     let loaded = null
     let adopted = false
+    if (mountedRef.current) setError(null)
 
     try {
-      const saved = await getLatestDraft()
-      if (!currentRequest(request) || !saved) return
-      if (!validateDraft(saved).ok) throw new Error('invalid draft')
-
       const asset = await getAsset(saved.assetId)
       if (!asset?.blob) throw new Error('missing asset')
 
@@ -73,10 +88,13 @@ export default function EditorRoute({ initialFile, onBack, onGenerated }) {
 
       setEditorImage(loaded)
       adopted = true
-      setDraft(saved)
+      setDraft(hydrateDraft(saved))
     } catch {
       if (loaded && !adopted) revokeImage(loaded)
-      if (currentRequest(request)) setError(restoreError)
+      if (currentRequest(request)) {
+        setResumable(null)
+        setError(restoreError)
+      }
     }
   }
 
@@ -100,7 +118,7 @@ export default function EditorRoute({ initialFile, onBack, onGenerated }) {
 
     if (!startedRecovery.current) {
       startedRecovery.current = true
-      void recoverLatestDraft()
+      void probeResumableDraft()
     }
   }, [initialFile])
 
@@ -108,23 +126,32 @@ export default function EditorRoute({ initialFile, onBack, onGenerated }) {
     try {
       setError(null)
       if (!image) throw new Error('The source image is no longer available.')
-      const result = quantizeToGrid(image, currentDraft.grid.columns, 4, {
+      const colorCount = currentDraft.image?.colorCount ?? createDraftImage().colorCount
+      const result = quantizeToGrid(image, currentDraft.grid.columns, colorCount, {
         rows: currentDraft.grid.rows,
         draft: currentDraft,
       })
+      // Yarn choices override the sampled colour and its name; anything the
+      // maker never renamed still shows what part it plays in the photo
+      // (Background / Foreground / Accent) rather than a bare rank letter.
+      const overrides = currentDraft.yarns || []
+      const colors = result.colors.map((hex, i) => overrides[i]?.hex || hex)
+      const yarnLabels = result.colors.map((_, i) => overrides[i]?.label || result.roles[i] || null)
+      const existing = projects?.find((p) => p.editorDraftId === currentDraft.id)
       const project = {
-        id: `p-${Date.now()}`,
+        id: existing?.id || `p-${Date.now()}`,
         editorDraftId: currentDraft.id,
         name: currentDraft.name,
         stitchesWide: currentDraft.grid.columns,
         totalRows: currentDraft.grid.rows,
         colorCount: result.colors.length,
         workingMethod: currentDraft.grid.workingMethod,
-        colors: result.colors,
+        colors,
+        yarnLabels,
         grid: result.grid,
         currentRow: 1,
       }
-      addProject(project)
+      upsertProject(project)
       onGenerated?.(project.id)
     } catch (reason) {
       setError(reason?.message || 'The chart could not be generated.')
@@ -161,6 +188,11 @@ export default function EditorRoute({ initialFile, onBack, onGenerated }) {
       <button className="pill-primary" type="button" onClick={() => fileRef.current?.click()}>
         Choose a photo
       </button>
+      {resumable && (
+        <button className="mono press" type="button" onClick={() => void resumeDraft(resumable)}>
+          {`Resume “${resumable.name}”`}
+        </button>
+      )}
       <input
         ref={fileRef}
         hidden

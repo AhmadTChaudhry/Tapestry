@@ -8,14 +8,14 @@ export default function MyCharts({ onOpen, onNew, onImportFile }) {
   const fileRef = useRef(null)
 
   return (
-    <div className="screen">
+    <div className="screen screen--tab">
       <div
         className="pad no-bar"
         style={{
           flex: 1,
           overflowY: 'auto',
           paddingTop: 'max(66px, calc(env(safe-area-inset-top) + 22px))',
-          paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
+          paddingBottom: 24,
           display: 'flex',
           flexDirection: 'column',
           gap: 22,

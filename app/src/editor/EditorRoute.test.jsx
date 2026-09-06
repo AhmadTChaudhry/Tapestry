@@ -5,7 +5,7 @@ import EditorRoute from './EditorRoute'
 import { loadImageFile, quantizeToGrid, revokeImage } from '../lib/quantize'
 import { getAsset, getLatestDraft, saveAsset, saveDraft } from './draftRepository'
 
-const store = vi.hoisted(() => ({ addProject: vi.fn() }))
+const store = vi.hoisted(() => ({ upsertProject: vi.fn(), projects: [] }))
 
 vi.mock('./draftRepository', () => ({
   saveAsset: vi.fn(),
@@ -13,7 +13,9 @@ vi.mock('./draftRepository', () => ({
   getAsset: vi.fn(),
   getLatestDraft: vi.fn(() => Promise.resolve(null)),
 }))
-vi.mock('../store', () => ({ useStore: () => ({ addProject: store.addProject }) }))
+vi.mock('../store', () => ({
+  useStore: () => ({ projects: store.projects, upsertProject: store.upsertProject }),
+}))
 vi.mock('../lib/quantize', () => ({
   loadImageFile: vi.fn(),
   quantizeToGrid: vi.fn(),
@@ -54,10 +56,13 @@ describe('EditorRoute', () => {
     saveAsset.mockResolvedValue(asset)
     saveDraft.mockResolvedValue(undefined)
     loadImageFile.mockResolvedValue(image)
-    quantizeToGrid.mockReturnValue({ grid: [[0]], colors: ['#000000'] })
+    quantizeToGrid.mockReturnValue({ grid: [[0]], colors: ['#000000'], roles: ['Background'] })
   })
 
-  afterEach(() => vi.clearAllMocks())
+  afterEach(() => {
+    store.projects = []
+    vi.clearAllMocks()
+  })
 
   it('shows an explicit empty import state', async () => {
     render(<EditorRoute onBack={() => {}} onGenerated={() => {}} />)
@@ -80,34 +85,63 @@ describe('EditorRoute', () => {
     }))
   })
 
-  it('restores the latest persisted draft and its image asset', async () => {
+  it('offers a recoverable draft without opening it', async () => {
     getLatestDraft.mockResolvedValue(savedDraft)
     getAsset.mockResolvedValue({ ...asset, blob: new Blob(['image'], { type: 'image/png' }) })
 
     render(<EditorRoute onBack={() => {}} onGenerated={() => {}} />)
+
+    expect(await screen.findByRole('button', { name: 'Resume \u201cRecovered fox\u201d' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Choose a photo' })).toBeEnabled()
+    expect(screen.queryByText('Editing Recovered fox')).toBeNull()
+    expect(loadImageFile).not.toHaveBeenCalled()
+  })
+
+  it('opens the recovered draft only once the offer is accepted', async () => {
+    getLatestDraft.mockResolvedValue(savedDraft)
+    getAsset.mockResolvedValue({ ...asset, blob: new Blob(['image'], { type: 'image/png' }) })
+
+    render(<EditorRoute onBack={() => {}} onGenerated={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Resume \u201cRecovered fox\u201d' }))
 
     expect(await screen.findByText('Editing Recovered fox')).toBeVisible()
     expect(getAsset).toHaveBeenCalledWith('asset-1')
     expect(loadImageFile).toHaveBeenCalledWith(expect.any(Blob))
   })
 
-  it('returns to the import state with an error when a saved asset is missing', async () => {
+  it('reports a restore failure when the asset disappears before the offer is accepted', async () => {
+    getLatestDraft.mockResolvedValue(savedDraft)
+    getAsset.mockResolvedValueOnce({ ...asset, blob: new Blob(['image'], { type: 'image/png' }) })
+    render(<EditorRoute onBack={() => {}} onGenerated={() => {}} />)
+    const resume = await screen.findByRole('button', { name: 'Resume \u201cRecovered fox\u201d' })
+    getAsset.mockResolvedValue(undefined)
+
+    fireEvent.click(resume)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your saved draft could not be restored.')
+    expect(screen.getByRole('button', { name: 'Choose a photo' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
+  })
+
+  it('offers no resume when the saved draft has lost its asset', async () => {
     getLatestDraft.mockResolvedValue(savedDraft)
 
     render(<EditorRoute onBack={() => {}} onGenerated={() => {}} />)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Your saved draft could not be restored.')
-    expect(screen.getByRole('button', { name: 'Choose a photo' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: 'Choose a photo' })).toBeEnabled()
+    await waitFor(() => expect(getAsset).toHaveBeenCalledWith('asset-1'))
+    expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('returns to the actionable import state when a persisted draft is malformed', async () => {
+  it('offers no resume when a persisted draft is malformed', async () => {
     getLatestDraft.mockResolvedValue({ ...savedDraft, name: '' })
 
     render(<EditorRoute onBack={() => {}} onGenerated={() => {}} />)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Your saved draft could not be restored.')
+    expect(await screen.findByRole('button', { name: 'Choose a photo' })).toBeEnabled()
     expect(getAsset).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Choose a photo' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
   })
 
   it('does not import the same initial file twice when effects are replayed', async () => {
@@ -154,7 +188,7 @@ describe('EditorRoute', () => {
   it('generates a chart with the current editor draft and bottom-first quantizer result', async () => {
     const file = new File(['image'], 'winter-fox.png', { type: 'image/png' })
     const onGenerated = vi.fn()
-    quantizeToGrid.mockReturnValue({ grid: [[0, 1], [1, 0]], colors: ['#000000', '#FFFFFF'] })
+    quantizeToGrid.mockReturnValue({ grid: [[0, 1], [1, 0]], colors: ['#000000', '#FFFFFF'], roles: ['Background', 'Foreground'] })
 
     render(<EditorRoute initialFile={file} onBack={() => {}} onGenerated={onGenerated} />)
     await screen.findByText('Editing Winter fox')
@@ -164,7 +198,7 @@ describe('EditorRoute', () => {
       rows: 20,
       draft: expect.objectContaining({ name: 'Winter fox' }),
     }))
-    expect(store.addProject).toHaveBeenCalledWith(expect.objectContaining({
+    expect(store.upsertProject).toHaveBeenCalledWith(expect.objectContaining({
       editorDraftId: expect.any(String),
       name: 'Winter fox',
       stitchesWide: 24,
@@ -175,6 +209,40 @@ describe('EditorRoute', () => {
       currentRow: 1,
     }))
     expect(onGenerated).toHaveBeenCalledWith(expect.stringMatching(/^p-/))
+  })
+
+  it('regenerates into the chart the draft already produced', async () => {
+    const file = new File(['image'], 'winter-fox.png', { type: 'image/png' })
+    const onGenerated = vi.fn()
+    saveDraft.mockImplementation((next) => { store.projects = [{ id: 'p-existing', editorDraftId: next.id }]; return Promise.resolve() })
+
+    render(<EditorRoute initialFile={file} onBack={() => {}} onGenerated={onGenerated} />)
+    await screen.findByText('Editing Winter fox')
+    fireEvent.click(screen.getByRole('button', { name: 'Generate chart' }))
+
+    expect(store.upsertProject).toHaveBeenCalledWith(expect.objectContaining({ id: 'p-existing' }))
+    expect(onGenerated).toHaveBeenCalledWith('p-existing')
+  })
+
+  it('generates with the chosen palette size and yarn overrides', async () => {
+    const file = new File(['image'], 'winter-fox.png', { type: 'image/png' })
+    quantizeToGrid.mockReturnValue({ grid: [[0, 1]], colors: ['#111111', '#222222'], roles: ['Background', 'Foreground'] })
+    saveDraft.mockImplementation(() => Promise.resolve())
+    vi.mocked(getLatestDraft).mockResolvedValue(null)
+
+    render(<EditorRoute initialFile={file} onBack={() => {}} onGenerated={() => {}} />)
+    await screen.findByText('Editing Winter fox')
+    // the mocked ChartEditor hands back whatever draft it was given, so drive
+    // the palette through the draft itself
+    fireEvent.click(screen.getByRole('button', { name: 'Generate chart' }))
+
+    expect(quantizeToGrid).toHaveBeenCalledWith(image, 24, 4, expect.anything())
+    expect(store.upsertProject).toHaveBeenCalledWith(expect.objectContaining({
+      colors: ['#111111', '#222222'],
+      // nobody visited the Yarn stage, so the label still falls back to
+      // what part the colour plays rather than staying blank
+      yarnLabels: ['Background', 'Foreground'],
+    }))
   })
 
   it('keeps the editor open and reports a generation failure', async () => {
@@ -188,7 +256,7 @@ describe('EditorRoute', () => {
     const alert = screen.getByRole('alert')
     expect(alert).toHaveTextContent('Canvas unavailable')
     expect(alert.closest('main.editor-screen')).not.toBeNull()
-    expect(store.addProject).not.toHaveBeenCalled()
+    expect(store.upsertProject).not.toHaveBeenCalled()
   })
 
   it('receives the current draft from Back before returning to the chart list', async () => {

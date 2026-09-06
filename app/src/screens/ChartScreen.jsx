@@ -1,9 +1,9 @@
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useStore, useWakeLock, tick } from '../store'
-import { cellMetrics, percentDone, runsForRow, visibleRows, rowCells } from '../lib/chart'
+import { cellMetrics, percentDone, runsForRow, visibleRows, rowCells, yarnLabel } from '../lib/chart'
 
-/** Colours are labelled A, B, C… by rank, the way a written pattern does it. */
-export const colorLabel = (i) => String.fromCharCode(65 + i)
+/** Kept for callers that only need the default rank letter. */
+export { rankLabel as colorLabel } from '../lib/chart'
 
 export default function ChartScreen({ projectId, onBack }) {
   const { projects, gauge, gaps, theme, setGauge, setRow, toggleGaps, toggleTheme } = useStore()
@@ -134,7 +134,7 @@ export default function ChartScreen({ projectId, onBack }) {
             >
               <Swatch hex={project.colors[run.index]} size={11} round />
               <span className="mono" style={{ fontSize: 12, color: 'var(--ink)' }}>
-                {run.count} {colorLabel(run.index)}
+                {run.count} {yarnLabel(run.index, project)}
               </span>
             </span>
           ))}
@@ -229,7 +229,7 @@ export default function ChartScreen({ projectId, onBack }) {
               >
                 <Swatch hex={hex} size={14} />
                 <span className="mono" style={{ fontSize: 12, color: 'var(--body)' }}>
-                  {colorLabel(i)}
+                  {yarnLabel(i, project)}
                 </span>
               </span>
             ))}

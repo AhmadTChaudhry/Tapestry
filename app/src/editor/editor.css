@@ -73,6 +73,7 @@
   place-items: center;
   container-type: size;
   border-radius: 16px;
+  border: 1px solid var(--hairline);
   background: var(--canvas);
 }
 
@@ -109,13 +110,28 @@
 }
 
 .editor-sheet {
+  position: relative;
   height: 100%;
   min-height: 0;
   overflow-y: auto;
-  padding: 18px 18px max(18px, env(safe-area-inset-bottom));
-  border-top: 1px solid var(--border);
+  padding: 22px 18px max(18px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--hairline);
   border-radius: 22px 22px 0 0;
-  background: var(--surface);
+  background: var(--paper);
+  box-shadow: var(--shadow-sheet);
+}
+
+/* Grab handle, so the sheet reads as a sheet even though it does not drag. */
+.editor-sheet::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  width: 38px;
+  height: 4px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--border-strong);
 }
 
 .editor-sheet-stack {
@@ -123,8 +139,29 @@
 }
 
 .editor-sheet h2 {
-  margin: 0 0 14px;
-  font-size: 20px;
+  margin: 0 0 16px;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.editor-note {
+  margin: 0;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.editor-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .editor-control,
@@ -161,9 +198,39 @@
   pointer-events: none;
 }
 
+/* Controls sit flat on the sheet's own paper colour, the same figure/ground
+   ImportGrid's Field rows use — a white card here read as a stray surface
+   dropped onto the app rather than part of it. */
 .editor-controls {
   display: grid;
-  gap: 14px;
+  gap: 18px;
+}
+
+.editor-field-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.editor-field-value {
+  color: var(--accent-readout);
+  font-size: 13px;
+  text-align: right;
+}
+
+.editor-group {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.editor-total {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .editor-control {
@@ -179,50 +246,245 @@
 }
 
 .editor-control input[type='number'] {
-  width: 84px;
+  width: 92px;
   min-height: 44px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 0 10px;
-  background: var(--surface);
+  padding: 0 12px;
+  background: var(--paper);
   color: var(--ink);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
-.editor-segmented,
-.editor-controls fieldset {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
+.editor-control input[type='number']:focus-visible {
+  outline: 2px solid var(--accent-readout);
+  outline-offset: 1px;
+}
+
+.editor-control input[type='number']:disabled {
+  color: var(--faint);
+  background: var(--sunken);
 }
 
 .editor-controls legend {
   width: 100%;
-  margin-bottom: 6px;
-  font-weight: 600;
+  padding: 0;
 }
 
-.editor-segmented label,
-.editor-controls fieldset label,
+.editor-segmented {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--sunken);
+}
+
+.editor-choice {
+  position: relative;
+  display: grid;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 9px;
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  transition: background-color 160ms ease-out, color 160ms ease-out;
+}
+
+/* The control still exists for pointers, keyboards and assistive tech — it is
+   stretched over the pill and made transparent rather than hidden. */
+.editor-choice input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.editor-choice:has(input:checked) {
+  color: #fff;
+  background: var(--accent);
+  box-shadow: var(--shadow-card);
+}
+
+.editor-choice:has(input:focus-visible) {
+  outline: 3px solid var(--accent-readout);
+  outline-offset: 2px;
+}
+
 .editor-check {
   display: flex;
   align-items: center;
   min-height: 44px;
-  gap: 7px;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.editor-check input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
 }
 
 .editor-actions {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
   gap: 8px;
 }
 
 .editor-actions button {
   min-height: 44px;
+  padding: 0 12px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
+  background: var(--surface);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.editor-actions button:disabled {
+  color: var(--faint);
+  border-color: var(--border);
+  cursor: default;
+}
+
+.editor-actions .pill-primary {
+  grid-column: 1 / -1;
+  border: 0;
+  color: #fff;
+}
+
+.editor-controls > .pill-primary {
+  margin-top: 4px;
+}
+
+/* --- Yarn stage ------------------------------------------------------- */
+.editor-yarn-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editor-yarn {
+  display: grid;
+  grid-template-columns: 18px 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 10px;
+}
+
+.editor-yarn-rank {
+  color: var(--faint);
+  font-size: 12px;
+  text-align: center;
+}
+
+.editor-yarn-swatch {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+}
+
+.editor-yarn-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.editor-yarn-name input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.editor-yarn-name input:focus-visible {
+  outline: 2px solid var(--accent-readout);
+  outline-offset: 1px;
+}
+
+.editor-yarn-revert {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--sunken);
+  color: var(--body);
+  font-size: 15px;
+}
+
+/* --- Review stage ---------------------------------------------------- */
+.editor-summary {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 2px 14px;
+  border-radius: 14px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+}
+
+.editor-summary-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.editor-summary-row:last-child {
+  border-bottom: 0;
+}
+
+.editor-summary dd {
+  margin: 0;
+  color: var(--accent-readout);
+  font-size: 14px;
+}
+
+/* --- escape hatch shown only after a save has actually failed --------- */
+.editor-escape {
+  position: absolute;
+  z-index: 3;
+  top: max(112px, calc(env(safe-area-inset-top) + 104px));
+  right: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.editor-escape button {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
 }
 
 @media (max-height: 640px) {

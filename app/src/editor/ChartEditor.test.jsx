@@ -84,7 +84,7 @@ describe('ChartEditor', () => {
     await user.click(screen.getByRole('tab', { name: 'Yarn' }))
 
     expect(screen.getByRole('img', { name: 'Source preview' })).toBeVisible()
-    expect(screen.getByRole('tabpanel', { name: 'Yarn' })).toHaveTextContent('Yarn mapping arrives in phase 3.')
+    expect(screen.getByRole('tabpanel', { name: 'Yarn' })).toHaveTextContent(/palette/i)
   })
 
   it('supports arrow-key movement between editor tabs', async () => {
@@ -122,6 +122,37 @@ describe('ChartEditor', () => {
 
     await waitFor(() => expect(onPersistError).toHaveBeenCalledWith(expect.any(Error)))
     expect(onBack).not.toHaveBeenCalled()
+  })
+
+  it('offers a way out once a save has actually failed', async () => {
+    const user = userEvent.setup()
+    const onPersistError = vi.fn()
+    const { draft, onBack } = createEditor({ onPersistError })
+    vi.mocked(saveDraft).mockRejectedValueOnce(new Error('disk full'))
+
+    // No escape hatch until an attempt has failed — the normal path still saves.
+    expect(screen.queryByRole('button', { name: 'Leave without saving' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(onPersistError).toHaveBeenCalledOnce())
+    expect(onBack).not.toHaveBeenCalled()
+
+    await user.click(await screen.findByRole('button', { name: 'Leave without saving' }))
+
+    expect(onBack).toHaveBeenCalledWith(expect.objectContaining({ id: draft.id }))
+  })
+
+  it('summarises the draft on the review stage', async () => {
+    const user = userEvent.setup()
+    const { draft } = createEditor()
+    const { columns, rows } = draft.grid
+
+    await user.click(screen.getByRole('tab', { name: 'Review' }))
+    const panel = screen.getByRole('tabpanel', { name: 'Review' })
+
+    expect(panel).toHaveTextContent(`${columns} × ${rows}`)
+    expect(panel).toHaveTextContent(String(columns * rows))
+    expect(panel).toHaveTextContent('In the round')
+    expect(screen.getByRole('button', { name: 'Generate chart' })).toBeEnabled()
   })
 
   it('renders action errors inside the editor viewport', () => {

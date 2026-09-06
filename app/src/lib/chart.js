@@ -1,3 +1,11 @@
+/** Colours are labelled A, B, C… by rank, the way a written pattern does it.
+ *  A project can override any rank with the yarn name set in the editor. */
+export const rankLabel = (index) => String.fromCharCode(65 + index)
+export const yarnLabel = (index, project) => {
+  const named = project?.yarnLabels?.[index]
+  return typeof named === 'string' && named.trim() !== '' ? named : rankLabel(index)
+}
+
 // Derived chart values. Nothing here is stored — see README "State Management".
 import { STITCH_ASPECT } from './quantize'
 
